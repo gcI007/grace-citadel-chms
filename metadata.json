@@ -1,0 +1,6 @@
+{
+  "name": "Church Management System",
+  "description": "Core ChMS featuring a member directory, attendance tracker, birthday listing, relational schema explorer, and automated welcome/outreach campaign messaging.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
