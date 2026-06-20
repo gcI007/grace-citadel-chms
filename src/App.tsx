@@ -58,7 +58,6 @@ export default function App() {
   }, []);
 
   // --- SECURITY ROLES ---
-  // If the logged-in email contains "usher", they get restricted access. Otherwise, full admin.
   const userEmail = session?.user?.email?.toLowerCase() || '';
   const isUsher = userEmail.includes('usher');
   const isAdmin = !isUsher;
@@ -236,11 +235,17 @@ export default function App() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               
-              {/* EVERYONE SEES THE CHECK-IN BUTTON */}
+              {/* EVERYONE SEES THESE BUTTONS */}
               <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
                 <h2 className="text-lg font-semibold mb-2 text-gray-900 flex items-center gap-2"><CheckSquare size={18} className="text-orange-500"/> Check-In</h2>
                 <p className="text-gray-500 text-sm mb-4">Track which members attended service.</p>
                 <button onClick={() => setActiveView('attendance')} className="text-blue-600 font-medium text-sm hover:underline">Log Attendance &rarr;</button>
+              </div>
+
+              <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
+                <h2 className="text-lg font-semibold mb-2 text-gray-900 flex items-center gap-2"><UserPlus size={18} className="text-orange-500"/> Registration</h2>
+                <p className="text-gray-500 text-sm mb-4">Register First Timers or add regular members.</p>
+                <button onClick={() => {setActiveView('members'); setStatusMessage('');}} className="text-blue-600 font-medium text-sm hover:underline">Open Form &rarr;</button>
               </div>
 
               {/* ONLY ADMINS SEE THESE BUTTONS */}
@@ -255,11 +260,6 @@ export default function App() {
                     <h2 className="text-lg font-semibold mb-2 text-red-700 flex items-center gap-2"><UserMinus size={18} className="text-red-600"/> Absentee Alert</h2>
                     <p className="text-gray-500 text-sm mb-4">See members missing for 2 weeks or more.</p>
                     <button onClick={() => setActiveView('absentees')} className="text-red-600 font-medium text-sm hover:underline">View Missing &rarr;</button>
-                  </div>
-                  <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
-                    <h2 className="text-lg font-semibold mb-2 text-gray-900 flex items-center gap-2"><UserPlus size={18} className="text-orange-500"/> Registration</h2>
-                    <p className="text-gray-500 text-sm mb-4">Register First Timers or add regular members.</p>
-                    <button onClick={() => {setActiveView('members'); setStatusMessage('');}} className="text-blue-600 font-medium text-sm hover:underline">Open Form &rarr;</button>
                   </div>
                   <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
                     <h2 className="text-lg font-semibold mb-2 text-gray-900 flex items-center gap-2"><ClipboardList size={18} className="text-orange-500"/> Guest Roster</h2>
@@ -278,7 +278,7 @@ export default function App() {
         )}
 
         {/* ========================================== */}
-        {/* SECURE VIEWS - ADMIN ONLY (Except Check-In)*/}
+        {/* SECURE VIEWS - ADMIN ONLY */}
         {/* ========================================== */}
         
         {/* ANALYTICS & REPORTS */}
@@ -290,24 +290,6 @@ export default function App() {
               <div><h3 className="text-lg font-bold text-gray-800 mb-3 bg-gray-50 p-3 rounded-t-lg border border-b-0 border-gray-200">Total Headcount per Service</h3><div className="overflow-x-auto border border-gray-200 rounded-b-lg"><table className="w-full text-left border-collapse"><thead><tr className="bg-gray-100 border-b border-gray-200 text-sm font-semibold text-gray-700"><th className="p-3">Service Date</th><th className="p-3">Total Checked In</th></tr></thead><tbody className="divide-y divide-gray-200">{serviceStats.length === 0 ? (<tr><td colSpan={2} className="p-4 text-center text-gray-500">No services logged yet.</td></tr>) : (serviceStats.map((stat, idx) => (<tr key={idx} className="hover:bg-orange-50"><td className="p-3 font-medium text-gray-900">{new Date(stat.date).toLocaleDateString()}</td><td className="p-3 font-bold text-orange-600">{stat.count} members</td></tr>)))}</tbody></table></div></div>
               <div><h3 className="text-lg font-bold text-gray-800 mb-3 bg-gray-50 p-3 rounded-t-lg border border-b-0 border-gray-200">Member Attendance Frequency</h3><div className="overflow-x-auto border border-gray-200 rounded-b-lg max-h-[500px] overflow-y-auto"><table className="w-full text-left border-collapse"><thead><tr className="bg-gray-100 border-b border-gray-200 text-sm font-semibold text-gray-700"><th className="p-3 sticky top-0 bg-gray-100">Member Name</th><th className="p-3 sticky top-0 bg-gray-100">Times Attended</th></tr></thead><tbody className="divide-y divide-gray-200">{memberStats.length === 0 ? (<tr><td colSpan={2} className="p-4 text-center text-gray-500">No attendance data yet.</td></tr>) : (memberStats.map((member, idx) => (<tr key={idx} className="hover:bg-blue-50"><td className="p-3 font-medium text-gray-900">{member.name}</td><td className="p-3 font-bold text-blue-600">{member.count}x</td></tr>)))}</tbody></table></div></div>
             </div>
-          </div>
-        )}
-
-        {/* REGISTRATION FORM */}
-        {activeView === 'members' && isAdmin && (
-          <div className="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-sm border">
-            <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6"><ArrowLeft size={16} /> Back to Dashboard</button>
-            <h2 className="text-2xl font-bold mb-4">Registration Form</h2>
-            <form onSubmit={handleSaveMember} className="flex flex-col gap-4 max-w-md">
-              <div className="bg-orange-50 p-4 rounded-lg border border-orange-100 mb-2"><label className="block text-sm font-bold text-orange-900 mb-1">Registration Type (Status)</label><select value={memberStatus} onChange={(e) => setMemberStatus(e.target.value)} className="w-full border border-orange-300 rounded-md p-2 bg-white outline-none focus:ring-2 focus:ring-orange-500"><option value="1st Timer">1st Timer</option><option value="2nd Timer">2nd Timer</option><option value="Regular">Regular Member</option></select></div>
-              <div><label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label><input type="text" required value={name} onChange={(e) => setName(e.target.value)} className="w-full border border-gray-300 rounded-md p-2" /></div>
-              <div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-medium text-gray-700 mb-1">Gender</label><select value={gender} onChange={(e) => setGender(e.target.value)} className="w-full border border-gray-300 rounded-md p-2 bg-white"><option value="">Select...</option><option value="Male">Male</option><option value="Female">Female</option></select></div><div><label className="block text-sm font-medium text-gray-700 mb-1">Birthday</label><input type="text" value={dob} onChange={(e) => setDob(e.target.value)} className="w-full border border-gray-300 rounded-md p-2" /></div></div>
-              <div><label className="block text-sm font-medium text-gray-700 mb-1">Occupation</label><input type="text" value={occupation} onChange={(e) => setOccupation(e.target.value)} className="w-full border border-gray-300 rounded-md p-2" /></div>
-              <div><label className="block text-sm font-medium text-gray-700 mb-1">Email</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full border border-gray-300 rounded-md p-2" /></div>
-              <div><label className="block text-sm font-medium text-gray-700 mb-1">Phone</label><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full border border-gray-300 rounded-md p-2" /></div>
-              <button type="submit" disabled={isSubmitting} className="bg-gray-900 text-white px-4 py-3 rounded-md hover:bg-gray-800 font-medium mt-2">{isSubmitting ? 'Saving...' : 'Save Registration'}</button>
-              {statusMessage && <div className={`p-3 rounded-md mt-2 text-sm font-medium ${statusMessage.includes('✅') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{statusMessage}</div>}
-            </form>
           </div>
         )}
 
@@ -340,10 +322,28 @@ export default function App() {
         )}
 
         {/* ========================================== */}
-        {/* PUBLIC VIEW - EVERYONE SEES THIS */}
+        {/* PUBLIC VIEW - EVERYONE SEES THESE */}
         {/* ========================================== */}
         
-        {/* DYNAMIC MEMBER CHECK-IN */}
+        {/* REGISTRATION FORM (EVERYONE) */}
+        {activeView === 'members' && (
+          <div className="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-sm border">
+            <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6"><ArrowLeft size={16} /> Back to Dashboard</button>
+            <h2 className="text-2xl font-bold mb-4">Registration Form</h2>
+            <form onSubmit={handleSaveMember} className="flex flex-col gap-4 max-w-md">
+              <div className="bg-orange-50 p-4 rounded-lg border border-orange-100 mb-2"><label className="block text-sm font-bold text-orange-900 mb-1">Registration Type (Status)</label><select value={memberStatus} onChange={(e) => setMemberStatus(e.target.value)} className="w-full border border-orange-300 rounded-md p-2 bg-white outline-none focus:ring-2 focus:ring-orange-500"><option value="1st Timer">1st Timer</option><option value="2nd Timer">2nd Timer</option><option value="Regular">Regular Member</option></select></div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label><input type="text" required value={name} onChange={(e) => setName(e.target.value)} className="w-full border border-gray-300 rounded-md p-2" /></div>
+              <div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-medium text-gray-700 mb-1">Gender</label><select value={gender} onChange={(e) => setGender(e.target.value)} className="w-full border border-gray-300 rounded-md p-2 bg-white"><option value="">Select...</option><option value="Male">Male</option><option value="Female">Female</option></select></div><div><label className="block text-sm font-medium text-gray-700 mb-1">Birthday</label><input type="text" value={dob} onChange={(e) => setDob(e.target.value)} className="w-full border border-gray-300 rounded-md p-2" /></div></div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">Occupation</label><input type="text" value={occupation} onChange={(e) => setOccupation(e.target.value)} className="w-full border border-gray-300 rounded-md p-2" /></div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">Email</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full border border-gray-300 rounded-md p-2" /></div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">Phone</label><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full border border-gray-300 rounded-md p-2" /></div>
+              <button type="submit" disabled={isSubmitting} className="bg-gray-900 text-white px-4 py-3 rounded-md hover:bg-gray-800 font-medium mt-2">{isSubmitting ? 'Saving...' : 'Save Registration'}</button>
+              {statusMessage && <div className={`p-3 rounded-md mt-2 text-sm font-medium ${statusMessage.includes('✅') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{statusMessage}</div>}
+            </form>
+          </div>
+        )}
+
+        {/* DYNAMIC MEMBER CHECK-IN (EVERYONE) */}
         {activeView === 'attendance' && (
           <div className="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-sm border">
             <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6"><ArrowLeft size={16} /> Back to Dashboard</button>
