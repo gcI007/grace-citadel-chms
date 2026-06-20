@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, ArrowLeft, Sparkles, Lock, LogOut, Cake, CheckSquare, Search, UserPlus, ClipboardList, UserMinus } from 'lucide-react';
+import { Users, ArrowLeft, Sparkles, Lock, LogOut, Cake, CheckSquare, Search, UserPlus, ClipboardList, UserMinus, BarChart3 } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
 // --- INITIALIZE SUPABASE ---
@@ -32,7 +32,11 @@ export default function App() {
 
   // --- ROSTER STATES ---
   const [guestList, setGuestList] = useState<any[]>([]);
-  const [absenteeList, setAbsenteeList] = useState<any[]>([]); // NEW: Absentee State
+  const [absenteeList, setAbsenteeList] = useState<any[]>([]);
+
+  // --- NEW: ANALYTICS STATE ---
+  const [serviceStats, setServiceStats] = useState<any[]>([]);
+  const [memberStats, setMemberStats] = useState<any[]>([]);
 
   // --- AI OUTREACH STATE ---
   const [promptContext, setPromptContext] = useState('');
@@ -61,7 +65,8 @@ export default function App() {
       setSelectedMembers([]); setCheckinStatusMessage(''); setSearchTerm('');
     }
     if (session && activeView === 'guests') fetchGuests();
-    if (session && activeView === 'absentees') fetchAbsentees(); // Trigger Absentee fetch
+    if (session && activeView === 'absentees') fetchAbsentees();
+    if (session && activeView === 'analytics') fetchAnalytics(); // NEW: Trigger Analytics
   }, [session, activeView]);
 
   const fetchBirthdays = async () => {
@@ -83,29 +88,48 @@ export default function App() {
     if (data) setGuestList(data);
   };
 
-  // --- NEW: FETCH ABSENTEES ENGINE (Missing for 14+ days) ---
   const fetchAbsentees = async () => {
-    // 1. Calculate the date 14 days ago
     const fourteenDaysAgo = new Date();
     fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
     const cutoffDate = fourteenDaysAgo.toISOString().split('T')[0];
 
-    // 2. Fetch ALL members
     const { data: allMembers } = await supabase.from('members').select('*').order('full_name');
-    
-    // 3. Fetch anyone who checked in during the last 14 days
-    const { data: recentCheckins } = await supabase
-      .from('member_checkins')
-      .select('member_name')
-      .gte('service_date', cutoffDate);
+    const { data: recentCheckins } = await supabase.from('member_checkins').select('member_name').gte('service_date', cutoffDate);
 
     if (allMembers && recentCheckins) {
-      // 4. Create a fast-lookup list of names who DID attend
       const recentAttendees = new Set(recentCheckins.map(c => c.member_name));
-      
-      // 5. Filter the main member list to ONLY show people NOT in the recent attendees list
       const missingMembers = allMembers.filter(m => !recentAttendees.has(m.full_name));
       setAbsenteeList(missingMembers);
+    }
+  };
+
+  // --- NEW: FETCH ANALYTICS ENGINE ---
+  const fetchAnalytics = async () => {
+    const { data, error } = await supabase.from('member_checkins').select('*');
+    if (data) {
+      // 1. Calculate Stats per Service Date
+      const dateCounts = data.reduce((acc: any, curr: any) => {
+        acc[curr.service_date] = (acc[curr.service_date] || 0) + 1;
+        return acc;
+      }, {});
+      
+      const formattedDates = Object.keys(dateCounts)
+        .map(date => ({ date, count: dateCounts[date] }))
+        .sort((a, b) => b.date.localeCompare(a.date)); // Sort newest first
+        
+      setServiceStats(formattedDates);
+
+      // 2. Calculate Consistency per Member
+      const memberCounts = data.reduce((acc: any, curr: any) => {
+        acc[curr.member_name] = (acc[curr.member_name] || 0) + 1;
+        return acc;
+      }, {});
+      
+      const formattedMembers = Object.keys(memberCounts)
+        .map(name => ({ name, count: memberCounts[name] }))
+        .sort((a, b) => b.count - a.count); // Sort highest attendance first
+        
+      setMemberStats(formattedMembers);
     }
   };
 
@@ -213,6 +237,21 @@ export default function App() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
+                <h2 className="text-lg font-semibold mb-2 text-gray-900 flex items-center gap-2"><CheckSquare size={18} className="text-orange-500"/> Check-In</h2>
+                <p className="text-gray-500 text-sm mb-4">Track which members attended service.</p>
+                <button onClick={() => setActiveView('attendance')} className="text-blue-600 font-medium text-sm hover:underline">Log Attendance &rarr;</button>
+              </div>
+              <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
+                <h2 className="text-lg font-semibold mb-2 text-gray-900 flex items-center gap-2"><BarChart3 size={18} className="text-orange-500"/> Analytics</h2>
+                <p className="text-gray-500 text-sm mb-4">View total headcounts and member consistency.</p>
+                <button onClick={() => setActiveView('analytics')} className="text-blue-600 font-medium text-sm hover:underline">View Stats &rarr;</button>
+              </div>
+              <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
+                <h2 className="text-lg font-semibold mb-2 text-red-700 flex items-center gap-2"><UserMinus size={18} className="text-red-600"/> Absentee Alert</h2>
+                <p className="text-gray-500 text-sm mb-4">See members missing for 2 weeks or more.</p>
+                <button onClick={() => setActiveView('absentees')} className="text-red-600 font-medium text-sm hover:underline">View Missing &rarr;</button>
+              </div>
+              <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
                 <h2 className="text-lg font-semibold mb-2 text-gray-900 flex items-center gap-2"><UserPlus size={18} className="text-orange-500"/> Registration</h2>
                 <p className="text-gray-500 text-sm mb-4">Register First Timers or add regular members.</p>
                 <button onClick={() => {setActiveView('members'); setStatusMessage('');}} className="text-blue-600 font-medium text-sm hover:underline">Open Form &rarr;</button>
@@ -223,19 +262,59 @@ export default function App() {
                 <button onClick={() => setActiveView('guests')} className="text-blue-600 font-medium text-sm hover:underline">View Guests &rarr;</button>
               </div>
               <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
-                <h2 className="text-lg font-semibold mb-2 text-red-700 flex items-center gap-2"><UserMinus size={18} className="text-red-600"/> Absentee Alert</h2>
-                <p className="text-gray-500 text-sm mb-4">See members missing for 2 weeks or more.</p>
-                <button onClick={() => setActiveView('absentees')} className="text-red-600 font-medium text-sm hover:underline">View Missing &rarr;</button>
-              </div>
-              <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
-                <h2 className="text-lg font-semibold mb-2 text-gray-900 flex items-center gap-2"><CheckSquare size={18} className="text-orange-500"/> Check-In</h2>
-                <p className="text-gray-500 text-sm mb-4">Track which members attended service.</p>
-                <button onClick={() => setActiveView('attendance')} className="text-blue-600 font-medium text-sm hover:underline">Log Attendance &rarr;</button>
-              </div>
-              <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow lg:col-span-2">
                 <h2 className="text-lg font-semibold mb-2 text-gray-900 flex items-center gap-2"><Sparkles size={18} className="text-orange-500"/> AI Outreach</h2>
                 <p className="text-gray-500 text-sm mb-4">Draft personalized messages using Gemini.</p>
                 <button onClick={() => setActiveView('outreach')} className="text-blue-600 font-medium text-sm hover:underline">Draft Message &rarr;</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* NEW: ANALYTICS & REPORTS */}
+        {activeView === 'analytics' && (
+          <div className="max-w-6xl mx-auto bg-white p-6 rounded-xl shadow-sm border">
+            <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6"><ArrowLeft size={16} /> Back to Dashboard</button>
+            <div className="flex items-center gap-2 mb-6"><BarChart3 className="text-orange-500" size={24} /><h2 className="text-2xl font-bold text-gray-900">Analytics & Reports</h2></div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Table 1: Stats by Date */}
+              <div>
+                <h3 className="text-lg font-bold text-gray-800 mb-3 bg-gray-50 p-3 rounded-t-lg border border-b-0 border-gray-200">Total Headcount per Service</h3>
+                <div className="overflow-x-auto border border-gray-200 rounded-b-lg">
+                  <table className="w-full text-left border-collapse">
+                    <thead><tr className="bg-gray-100 border-b border-gray-200 text-sm font-semibold text-gray-700"><th className="p-3">Service Date</th><th className="p-3">Total Checked In</th></tr></thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {serviceStats.length === 0 ? (<tr><td colSpan={2} className="p-4 text-center text-gray-500">No services logged yet.</td></tr>) : (
+                        serviceStats.map((stat, idx) => (
+                          <tr key={idx} className="hover:bg-orange-50">
+                            <td className="p-3 font-medium text-gray-900">{new Date(stat.date).toLocaleDateString()}</td>
+                            <td className="p-3 font-bold text-orange-600">{stat.count} members</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Table 2: Member Consistency */}
+              <div>
+                <h3 className="text-lg font-bold text-gray-800 mb-3 bg-gray-50 p-3 rounded-t-lg border border-b-0 border-gray-200">Member Attendance Frequency</h3>
+                <div className="overflow-x-auto border border-gray-200 rounded-b-lg max-h-[500px] overflow-y-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead><tr className="bg-gray-100 border-b border-gray-200 text-sm font-semibold text-gray-700"><th className="p-3 sticky top-0 bg-gray-100">Member Name</th><th className="p-3 sticky top-0 bg-gray-100">Times Attended</th></tr></thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {memberStats.length === 0 ? (<tr><td colSpan={2} className="p-4 text-center text-gray-500">No attendance data yet.</td></tr>) : (
+                        memberStats.map((member, idx) => (
+                          <tr key={idx} className="hover:bg-blue-50">
+                            <td className="p-3 font-medium text-gray-900">{member.name}</td>
+                            <td className="p-3 font-bold text-blue-600">{member.count}x</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>
@@ -292,7 +371,7 @@ export default function App() {
           </div>
         )}
 
-        {/* NEW: ABSENTEE ALERT ROSTER */}
+        {/* ABSENTEE ALERT ROSTER */}
         {activeView === 'absentees' && (
           <div className="max-w-6xl mx-auto bg-white p-6 rounded-xl shadow-sm border">
             <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6"><ArrowLeft size={16} /> Back to Dashboard</button>
