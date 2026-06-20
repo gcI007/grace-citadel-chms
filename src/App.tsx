@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, ArrowLeft, Sparkles, Lock, LogOut, Cake, CheckSquare, Search, UserPlus, ClipboardList, UserMinus, BarChart3, ShieldCheck, MessageCircle, MessageSquare, Heart, Gift, TrendingUp, CalendarDays, Share2, FileText, Home } from 'lucide-react';
+import { Users, ArrowLeft, Sparkles, Lock, LogOut, Cake, CheckSquare, Search, UserPlus, ClipboardList, UserMinus, BarChart3, ShieldCheck, MessageCircle, MessageSquare, Heart, Gift, TrendingUp, CalendarDays, Share2, FileText, Home, Activity } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
 // --- INITIALIZE SUPABASE ---
@@ -28,6 +28,7 @@ export default function App() {
   // --- APP STATE ---
   const [activeView, setActiveView] = useState('dashboard');
   const [template, setTemplate] = useState('welcome');
+  const [analyticsTab, setAnalyticsTab] = useState('service'); 
 
   // --- BIRTHDAY STATES ---
   const [birthdaysToday, setBirthdaysToday] = useState<any[]>([]);
@@ -47,6 +48,7 @@ export default function App() {
   const [monthlyChartData, setMonthlyChartData] = useState<any[]>([]);
   const [selectedMonthData, setSelectedMonthData] = useState<any | null>(null);
   const [memberStats, setMemberStats] = useState<any[]>([]);
+  const [cellStats, setCellStats] = useState({ overallAvg: 0, bestCell: '-', fastestGrowing: '-', trendData: [] as any[], cellsArray: [] as any[] });
 
   // --- FORM STATES (Registration) ---
   const [name, setName] = useState('');
@@ -60,7 +62,7 @@ export default function App() {
   const [statusMessage, setStatusMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // --- FORM STATES (Cell Meeting) --- NEW
+  // --- FORM STATES (Cell Meeting) ---
   const [cellName, setCellName] = useState('');
   const [cellLeader, setCellLeader] = useState('');
   const [cellDate, setCellDate] = useState(new Date().toISOString().split('T')[0]);
@@ -73,7 +75,7 @@ export default function App() {
   const [generatedMessage, setGeneratedMessage] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [memberList, setMemberList] = useState<any[]>([]);
-  const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+  const [selectedMembers, setSelectedMembers] = useState<any[]>([]); // 🔥 UPGRADED TO STORE IDs
   const [checkinDate, setCheckinDate] = useState(new Date().toISOString().split('T')[0]);
   const [searchTerm, setSearchTerm] = useState('');
   const [checkinStatusMessage, setCheckinStatusMessage] = useState('');
@@ -96,7 +98,7 @@ export default function App() {
         if (activeView === 'birthdays') fetchBirthdays();
         if (activeView === 'guests') fetchGuests();
         if (activeView === 'absentees') fetchAbsentees();
-        if (activeView === 'analytics') { fetchAnalytics(); setSelectedMonthData(null); }
+        if (activeView === 'analytics') { fetchAnalytics(); setSelectedMonthData(null); setAnalyticsTab('service'); }
         if (activeView === 'tasks') { fetchBirthdays(); fetchCrmTasks(); fetchAbsentees(); }
     }
     if (session && activeView === 'attendance') {
@@ -126,14 +128,19 @@ export default function App() {
     }
   };
 
-  const fetchMembersForCheckin = async () => { const { data } = await supabase.from('members').select('full_name').order('full_name'); if (data) setMemberList(data); };
+  // 🔥 UPGRADE: Fetching ID and Phone Number for exact identification
+  const fetchMembersForCheckin = async () => { 
+      const { data } = await supabase.from('members').select('id, full_name, phone_number').order('full_name'); 
+      if (data) setMemberList(data); 
+  };
+  
   const fetchGuests = async () => { const { data } = await supabase.from('members').select('*').in('status', ['1st Timer', '2nd Timer']).order('created_at', { ascending: false }); if (data) setGuestList(data); };
   
   const fetchAnalytics = async () => { 
-    const { data } = await supabase.from('member_checkins').select('*'); 
-    if (data) { 
+    const { data: checkins } = await supabase.from('member_checkins').select('*'); 
+    if (checkins) { 
       const monthMap: any = {};
-      data.forEach(checkin => {
+      checkins.forEach(checkin => {
         const dateObj = new Date(checkin.service_date); const monthKey = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
         if (!monthMap[monthKey]) monthMap[monthKey] = { monthName: monthKey, total: 0, sortDate: dateObj.getTime(), services: {} };
         monthMap[monthKey].total += 1;
@@ -141,9 +148,29 @@ export default function App() {
         monthMap[monthKey].services[checkin.service_date] += 1;
       });
       setMonthlyChartData(Object.values(monthMap).sort((a: any, b: any) => a.sortDate - b.sortDate));
-      const memberCounts = data.reduce((acc: any, curr: any) => { acc[curr.member_name] = (acc[curr.member_name] || 0) + 1; return acc; }, {}); 
+      const memberCounts = checkins.reduce((acc: any, curr: any) => { acc[curr.member_name] = (acc[curr.member_name] || 0) + 1; return acc; }, {}); 
       setMemberStats(Object.keys(memberCounts).map(name => ({ name, count: memberCounts[name] })).sort((a, b) => b.count - a.count)); 
     } 
+    const { data: cellData } = await supabase.from('cell_meetings').select('*');
+    if (cellData && cellData.length > 0) {
+        let totalAtt = 0; const cellGroups: any = {}; const monthlyTrend: any = {};
+        cellData.forEach(c => {
+            totalAtt += c.attendance_count;
+            if (!cellGroups[c.cell_name]) cellGroups[c.cell_name] = { name: c.cell_name, total: 0, count: 0, history: [] };
+            cellGroups[c.cell_name].total += c.attendance_count; cellGroups[c.cell_name].count += 1; cellGroups[c.cell_name].history.push({ date: c.meeting_date, count: c.attendance_count });
+            const d = new Date(c.meeting_date); const mKey = d.toLocaleString('default', { month: 'short', year: 'numeric' });
+            if (!monthlyTrend[mKey]) monthlyTrend[mKey] = { monthName: mKey, sortDate: d.getTime(), total: 0 };
+            monthlyTrend[mKey].total += c.attendance_count;
+        });
+        const overallAvg = Math.round(totalAtt / cellData.length);
+        const cellsArray = Object.values(cellGroups).map((cg: any) => {
+            cg.history.sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+            const avg = Math.round(cg.total / cg.count);
+            const growth = cg.history.length > 1 ? (cg.history[cg.history.length - 1].count - cg.history[0].count) : 0;
+            return { ...cg, avg, growth };
+        });
+        setCellStats({ overallAvg, bestCell: [...cellsArray].sort((a, b) => b.avg - a.avg)[0]?.name || 'N/A', fastestGrowing: [...cellsArray].sort((a, b) => b.growth - a.growth)[0]?.name || 'N/A', trendData: Object.values(monthlyTrend).sort((a: any, b: any) => a.sortDate - b.sortDate), cellsArray: cellsArray.sort((a, b) => b.avg - a.avg) });
+    }
   };
   
   const fetchAbsentees = async () => {
@@ -246,49 +273,85 @@ export default function App() {
     } catch (error: any) { setStatusMessage('❌ Error: ' + error.message); } finally { setIsSubmitting(false); }
   };
 
-  // --- 🔥 NEW: SAVE CELL MEETING REPORT 🔥 ---
   const handleSaveCellMeeting = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    setCellStatusMessage('Submitting report...');
+    e.preventDefault(); setIsSubmitting(true); setCellStatusMessage('Submitting report...');
     try {
-      const { error } = await supabase.from('cell_meetings').insert([{
-        cell_name: cellName,
-        leader_name: cellLeader,
-        meeting_date: cellDate,
-        attendance_count: parseInt(cellAttendance) || 0,
-        notes: cellNotes
-      }]);
+      const { error } = await supabase.from('cell_meetings').insert([{ cell_name: cellName, leader_name: cellLeader, meeting_date: cellDate, attendance_count: parseInt(cellAttendance) || 0, notes: cellNotes }]);
       if (error) throw error;
       setCellStatusMessage('✅ Cell Report saved successfully!');
       setCellName(''); setCellLeader(''); setCellAttendance(''); setCellNotes('');
-    } catch (error: any) {
-      setCellStatusMessage('❌ Error: ' + error.message);
-    } finally {
-      setIsSubmitting(false);
-    }
+    } catch (error: any) { setCellStatusMessage('❌ Error: ' + error.message); } finally { setIsSubmitting(false); }
   };
 
-  const toggleMemberSelection = (memberName: string) => setSelectedMembers(prev => prev.includes(memberName) ? prev.filter(n => n !== memberName) : [...prev, memberName]);
+  // 🔥 UPGRADE: Track selections using unique ID, not name
+  const toggleMemberSelection = (id: string) => setSelectedMembers(prev => prev.includes(id) ? prev.filter(n => n !== id) : [...prev, id]);
+  
+  // 🔥 UPGRADE: Smart Anti-Duplicate Engine
   const handleSaveCheckins = async () => {
     if (selectedMembers.length === 0) return setCheckinStatusMessage('❌ Please select at least one member.');
-    setIsSubmitting(true); setCheckinStatusMessage('Saving attendance...');
+    setIsSubmitting(true); 
+    setCheckinStatusMessage('Verifying against duplicates and saving...');
+    
     try {
-      const recordsToInsert = selectedMembers.map(n => ({ service_date: checkinDate, member_name: n }));
+      // 1. Get exact member details for selected IDs
+      const selectedObjects = memberList.filter(m => selectedMembers.includes(m.id));
+      const namesToInsert = selectedObjects.map(m => m.full_name);
+
+      // 2. Scan DB for anyone already checked in on this specific date
+      const { data: existingCheckins } = await supabase
+        .from('member_checkins')
+        .select('member_name')
+        .eq('service_date', checkinDate)
+        .in('member_name', namesToInsert);
+
+      const alreadyCheckedIn = new Set(existingCheckins?.map(c => c.member_name) || []);
+
+      // 3. Filter out duplicates
+      const validObjects = selectedObjects.filter(m => !alreadyCheckedIn.has(m.full_name));
+
+      if (validObjects.length === 0) {
+        setCheckinStatusMessage('⚠️ Alert: Everyone selected has already been checked in for this date.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // 4. Save only valid new records
+      const recordsToInsert = validObjects.map(m => ({ service_date: checkinDate, member_name: m.full_name }));
       const { error: insertError } = await supabase.from('member_checkins').insert(recordsToInsert);
       if (insertError) throw insertError;
-      const { data: currentMembers } = await supabase.from('members').select('full_name, status').in('full_name', selectedMembers);
+      
+      // 5. Upgrade Statuses for valid records
+      const validNames = validObjects.map(m => m.full_name);
+      const { data: currentMembers } = await supabase.from('members').select('full_name, status').in('full_name', validNames);
+      
       if (currentMembers) {
         const firstTimersToUpdate = currentMembers.filter(m => m.status === '1st Timer').map(m => m.full_name);
         const secondTimersToUpdate = currentMembers.filter(m => m.status === '2nd Timer').map(m => m.full_name);
         if (firstTimersToUpdate.length > 0) await supabase.from('members').update({ status: '2nd Timer' }).in('full_name', firstTimersToUpdate);
         if (secondTimersToUpdate.length > 0) await supabase.from('members').update({ status: 'Regular' }).in('full_name', secondTimersToUpdate);
       }
-      setCheckinStatusMessage(`✅ Successfully logged attendance!`); setSelectedMembers([]); setSearchTerm('');
-    } catch (error: any) { setCheckinStatusMessage('❌ Error: ' + error.message); } finally { setIsSubmitting(false); }
+      
+      setCheckinStatusMessage(`✅ Logged ${validObjects.length} members! ${alreadyCheckedIn.size > 0 ? `(${alreadyCheckedIn.size} duplicates skipped)` : ''}`);
+      setSelectedMembers([]); setSearchTerm('');
+    } catch (error: any) { 
+      setCheckinStatusMessage('❌ Error: ' + error.message); 
+    } finally { 
+      setIsSubmitting(false); 
+    }
   };
 
-  // --- COMMAND CENTER LIST SPLITTING ---
+  const handleGenerateMessage = async () => {
+    if (!promptContext) return; setIsGenerating(true); setGeneratedMessage('');
+    try { await new Promise(resolve => setTimeout(resolve, 2000)); setGeneratedMessage(`[ Simulated AI Response ]\n\nBlessings!\n\nThis is a placeholder message. Once you connect your Google Billing, the real Gemini AI will read your prompt ("${promptContext}") and automatically draft a beautiful, customized message right here!`); } catch (error: any) { setGeneratedMessage('❌ Error: ' + error.message); } finally { setIsGenerating(false); }
+  };
+
+  const BirthdayRow = ({ person }: { person: any }) => (
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-100 last:border-0 p-4 hover:bg-gray-50 transition-colors gap-3">
+      <div><div className="font-bold text-gray-900 text-lg">{person.full_name}</div><div className="text-gray-500 text-sm">{person.date_of_birth} • {person.phone_number || 'No Phone'}</div></div>
+      <div className="flex items-center gap-2 flex-wrap"><button onClick={() => handleSendMessage(person.phone_number, person.full_name, 'whatsapp', 'birthday')} className="flex items-center gap-1 bg-green-50 border border-green-200 text-green-700 px-3 py-1.5 rounded hover:bg-green-100 text-sm font-medium transition-colors"><MessageCircle size={16}/> WhatsApp</button><button onClick={() => handleSendMessage(person.phone_number, person.full_name, 'sms', 'birthday')} className="flex items-center gap-1 bg-blue-50 border border-blue-200 text-blue-700 px-3 py-1.5 rounded hover:bg-blue-100 text-sm font-medium transition-colors"><MessageSquare size={16}/> SMS</button><button onClick={() => { setActiveView('outreach'); setPromptContext(`Draft a highly personalized, joyous, and prophetic birthday blessing for ${person.full_name} who is a member of Grace Citadel church.`); }} className="flex items-center gap-1 bg-purple-50 border border-purple-200 text-purple-700 px-3 py-1.5 rounded hover:bg-purple-100 text-sm font-medium transition-colors"><Sparkles size={16}/> AI Drafter</button></div>
+    </div>
+  );
+
   const guestTasks = crmTasks.filter(t => t.member.status === '1st Timer' || t.member.status === '2nd Timer');
   const urgentMissingTasks = crmTasks.filter(t => t.type.includes('RED') || t.type.includes('ORANGE'));
 
@@ -309,6 +372,9 @@ export default function App() {
     );
   }
 
+  const maxMonthlyTotal = monthlyChartData.length > 0 ? Math.max(...monthlyChartData.map(d => d.total)) : 1;
+  const maxCellMonthlyTotal = cellStats.trendData.length > 0 ? Math.max(...cellStats.trendData.map(d => d.total)) : 1;
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <header className="bg-white shadow-sm border-b px-6 py-4 flex items-center justify-between">
@@ -325,117 +391,74 @@ export default function App() {
               
               <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow"><h2 className="text-lg font-semibold mb-2 text-gray-900 flex items-center gap-2"><CheckSquare size={18} className="text-orange-500"/> Service Check-In</h2><button onClick={() => setActiveView('attendance')} className="text-blue-600 font-medium text-sm hover:underline">Log Attendance &rarr;</button></div>
               <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow"><h2 className="text-lg font-semibold mb-2 text-gray-900 flex items-center gap-2"><UserPlus size={18} className="text-orange-500"/> Registration</h2><button onClick={() => {setActiveView('members'); setStatusMessage('');}} className="text-blue-600 font-medium text-sm hover:underline">Open Form &rarr;</button></div>
-              
-              {/* NEW CELL MEETING BUTTON FOR EVERYONE */}
-              <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
-                  <h2 className="text-lg font-semibold mb-2 text-gray-900 flex items-center gap-2"><Home size={18} className="text-orange-500"/> Cell Meeting Log</h2>
-                  <p className="text-gray-500 text-sm mb-4">Record weekly home fellowship attendance and notes.</p>
-                  <button onClick={() => {setActiveView('cell_log'); setCellStatusMessage('');}} className="text-blue-600 font-medium text-sm hover:underline">Submit Report &rarr;</button>
-              </div>
+              <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow"><h2 className="text-lg font-semibold mb-2 text-gray-900 flex items-center gap-2"><Home size={18} className="text-orange-500"/> Cell Meeting Log</h2><p className="text-gray-500 text-sm mb-4">Record weekly home fellowship attendance and notes.</p><button onClick={() => {setActiveView('cell_log'); setCellStatusMessage('');}} className="text-blue-600 font-medium text-sm hover:underline">Submit Report &rarr;</button></div>
 
               {isAdmin && (
                 <>
                   <div className="bg-gradient-to-br from-gray-900 to-gray-800 p-6 rounded-xl shadow-md border border-gray-700 hover:shadow-lg transition-shadow relative overflow-hidden"><h2 className="text-lg font-semibold mb-2 text-white flex items-center gap-2"><ShieldCheck size={18} className="text-orange-500"/> Pastoral Command Center</h2><p className="text-gray-400 text-sm mb-4">Your daily hub for birthdays, guests, and follow-ups.</p><button onClick={() => setActiveView('tasks')} className="text-orange-400 font-bold text-sm hover:underline">Open Command Center &rarr;</button></div>
-                  <div className="bg-gradient-to-br from-green-900 to-emerald-800 p-6 rounded-xl shadow-md border border-emerald-700 hover:shadow-lg transition-shadow"><h2 className="text-lg font-semibold mb-2 text-white flex items-center gap-2"><Share2 size={18} className="text-green-400"/> Bulk Outreach Node</h2><p className="text-emerald-200 text-sm mb-4">Send instant broadcast messages to all Students, Men, or Women.</p><button onClick={() => setActiveView('bulk')} className="text-emerald-300 font-bold text-sm hover:underline">Open Bulk Engine 🚀 &rarr;</button></div>
-                  <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow"><h2 className="text-lg font-semibold mb-2 text-indigo-700 flex items-center gap-2"><TrendingUp size={18} className="text-indigo-600"/> Service Analytics</h2><button onClick={() => setActiveView('analytics')} className="text-indigo-700 font-bold text-sm hover:underline">Open Dashboard &rarr;</button></div>
-                  <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow"><h2 className="text-lg font-semibold mb-2 text-red-700 flex items-center gap-2"><UserMinus size={18} className="text-red-600"/> Smart Absentee Radar</h2><button onClick={() => setActiveView('absentees')} className="text-red-600 font-medium text-sm hover:underline">View Radar Triage &rarr;</button></div>
-                  <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow"><h2 className="text-lg font-semibold mb-2 text-blue-800 flex items-center gap-2"><Gift size={18} className="text-blue-600"/> Birthday Dashboard</h2><button onClick={() => setActiveView('birthdays')} className="text-blue-700 font-bold text-sm hover:underline">Manage Birthdays &rarr;</button></div>
+                  <div className="bg-white p-6 rounded-xl shadow-sm border border-indigo-200 hover:shadow-md transition-shadow"><h2 className="text-lg font-semibold mb-2 text-indigo-800 flex items-center gap-2"><TrendingUp size={18} className="text-indigo-600"/> Service & Cell Analytics</h2><p className="text-gray-500 text-sm mb-4">Visual charts of Sunday and Cell Group growth.</p><button onClick={() => setActiveView('analytics')} className="text-indigo-700 font-bold text-sm hover:underline">Open Dashboard 📊 &rarr;</button></div>
+                  <div className="bg-gradient-to-br from-green-900 to-emerald-800 p-6 rounded-xl shadow-md border border-emerald-700 hover:shadow-lg transition-shadow"><h2 className="text-lg font-semibold mb-2 text-white flex items-center gap-2"><Share2 size={18} className="text-green-400"/> Bulk Outreach Node</h2><p className="text-emerald-200 text-sm mb-4">Broadcast messages to Students, Men, or Women.</p><button onClick={() => setActiveView('bulk')} className="text-emerald-300 font-bold text-sm hover:underline">Open Bulk Engine 🚀 &rarr;</button></div>
+                  <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow"><h2 className="text-lg font-semibold mb-2 text-red-700 flex items-center gap-2"><UserMinus size={18} className="text-red-600"/> Smart Absentee Radar</h2><p className="text-gray-500 text-sm mb-4">Alerts for missed services.</p><button onClick={() => setActiveView('absentees')} className="text-red-600 font-medium text-sm hover:underline">View Radar Triage &rarr;</button></div>
+                  <div className="bg-white p-6 rounded-xl shadow-sm border border-blue-200 hover:shadow-md transition-shadow relative overflow-hidden">{birthdaysToday.length > 0 && <div className="absolute top-0 right-0 bg-blue-500 text-white text-xs font-bold px-3 py-1 rounded-bl-lg">Today!</div>}<h2 className="text-lg font-semibold mb-2 text-blue-800 flex items-center gap-2"><Gift size={18} className="text-blue-600"/> Birthday Dashboard</h2><p className="text-blue-600 text-sm mb-4">{birthdaysToday.length} today • {birthdaysWeek.length} this week</p><button onClick={() => setActiveView('birthdays')} className="text-blue-700 font-bold text-sm hover:underline">Manage Birthdays &rarr;</button></div>
                 </>
               )}
             </div>
           </div>
         )}
 
-        {/* --- 🔥 NEW: CELL GROUP MEETING REPORT FORM 🔥 --- */}
-        {activeView === 'cell_log' && (
-          <div className="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+        {/* --- 🔥 UPGRADED DYNAMIC MEMBER CHECK-IN 🔥 --- */}
+        {activeView === 'attendance' && (
+          <div className="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-sm border">
             <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6"><ArrowLeft size={16} /> Back to Dashboard</button>
-            <div className="flex items-center gap-2 mb-2">
-                <Home className="text-orange-500" size={28} />
-                <h2 className="text-2xl font-bold text-gray-900">Cell Meeting Report</h2>
-            </div>
-            <p className="text-gray-600 mb-6 text-sm">Cell leaders, please fill out this quick report after your weekly fellowship.</p>
-            
-            <form onSubmit={handleSaveCellMeeting} className="flex flex-col gap-4 max-w-lg">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Cell Group Name / Location</label>
-                <input type="text" required value={cellName} onChange={(e) => setCellName(e.target.value)} placeholder="e.g. Grace Fellowship - Downtown" className="w-full border border-gray-300 rounded-md p-3 outline-none focus:border-orange-500" />
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Leader's Name</label>
-                    <input type="text" required value={cellLeader} onChange={(e) => setCellLeader(e.target.value)} className="w-full border border-gray-300 rounded-md p-3 outline-none focus:border-orange-500" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Total Attendance</label>
-                    <input type="number" required min="1" value={cellAttendance} onChange={(e) => setCellAttendance(e.target.value)} className="w-full border border-gray-300 rounded-md p-3 outline-none focus:border-orange-500" placeholder="e.g. 12" />
-                  </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Meeting Date</label>
-                <input type="date" required value={cellDate} onChange={(e) => setCellDate(e.target.value)} className="w-full border border-gray-300 rounded-md p-3 outline-none focus:border-orange-500" />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Meeting Notes / Testimonies / Prayer Requests</label>
-                <textarea rows={4} value={cellNotes} onChange={(e) => setCellNotes(e.target.value)} className="w-full border border-gray-300 rounded-md p-3 outline-none focus:border-orange-500" placeholder="Briefly describe how the meeting went..." />
-              </div>
-
-              <button type="submit" disabled={isSubmitting} className="bg-gray-900 text-white px-4 py-4 rounded-md font-bold mt-2 hover:bg-gray-800 transition-colors shadow">
-                {isSubmitting ? 'Submitting Report...' : 'Submit Cell Report'}
-              </button>
-              
-              {cellStatusMessage && (
-                <div className={`p-4 rounded-md mt-2 text-sm font-medium ${cellStatusMessage.includes('✅') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                    {cellStatusMessage}
+            <div className="flex items-center gap-2 mb-4"><CheckSquare className="text-orange-500" size={24} /><h2 className="text-2xl font-bold">Service Check-In</h2></div>
+            <div className="flex flex-col md:flex-row gap-4 mb-6">
+              <div className="flex-1"><label className="block text-sm font-medium text-gray-700 mb-1">Service Date</label><input type="date" value={checkinDate} onChange={(e) => setCheckinDate(e.target.value)} className="w-full border border-gray-300 rounded-md p-2" /></div>
+              <div className="flex-[2]">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Search by Name or Phone</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Search size={16} className="text-gray-400" /></div>
+                  <input type="text" placeholder="e.g. John Doe or 080..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full border border-gray-300 rounded-md py-2 pl-10 pr-3" />
                 </div>
-              )}
-            </form>
+              </div>
+            </div>
+            
+            <div className="border border-gray-200 rounded-lg overflow-hidden mb-4">
+              <div className="bg-gray-50 p-3 border-b border-gray-200 font-semibold text-gray-700 text-sm flex justify-between">
+                  <span>Congregation Roster</span><span className="text-orange-600">{selectedMembers.length} Selected</span>
+              </div>
+              <div className="max-h-[60vh] overflow-y-auto p-2 bg-white">
+                {memberList.filter(m => m.full_name.toLowerCase().includes(searchTerm.toLowerCase()) || (m.phone_number && m.phone_number.includes(searchTerm))).map((m, idx) => (
+                  <label key={m.id || idx} className="flex items-start gap-4 p-4 hover:bg-orange-50 rounded-md cursor-pointer border-b border-gray-100 last:border-0 transition-colors">
+                    <input type="checkbox" checked={selectedMembers.includes(m.id)} onChange={() => toggleMemberSelection(m.id)} className="w-6 h-6 mt-0.5 text-orange-500 rounded border-gray-300" />
+                    <div className="flex flex-col">
+                        <span className="text-gray-900 font-bold select-none text-lg">{m.full_name}</span>
+                        <span className="text-gray-500 text-sm font-medium">{m.phone_number || 'No phone number on file'}</span>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <button onClick={handleSaveCheckins} disabled={isSubmitting || memberList.length === 0} className="w-full md:w-auto bg-orange-500 text-white px-8 py-4 rounded-md hover:bg-orange-600 font-bold text-lg disabled:bg-gray-400 shadow-md transition-colors">
+                {isSubmitting ? 'Verifying...' : 'Save Attendance'}
+            </button>
+            
+            {checkinStatusMessage && (
+                <div className={`p-4 rounded-md mt-4 text-sm font-medium border ${checkinStatusMessage.includes('✅') ? 'bg-green-50 text-green-800 border-green-200' : checkinStatusMessage.includes('⚠️') ? 'bg-yellow-50 text-yellow-800 border-yellow-200' : 'bg-red-50 text-red-800 border-red-200'}`}>
+                    {checkinStatusMessage}
+                </div>
+            )}
           </div>
         )}
 
-        {/* --- PASTORAL COMMAND CENTER VIEW --- */}
-        {activeView === 'tasks' && isAdmin && (
-            <div className="max-w-6xl mx-auto space-y-6">
-                <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800"><ArrowLeft size={16} /> Back to Dashboard</button>
-                <div className="bg-gradient-to-r from-gray-900 to-gray-800 p-6 rounded-xl shadow-md text-white flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div><h2 className="text-2xl font-bold flex items-center gap-2"><ShieldCheck className="text-orange-500"/> Pastoral Command Center</h2><p className="text-gray-400 text-sm">Aggregated real-time oversight node.</p></div>
-                    <div className="flex gap-4">
-                        <button onClick={handleGenerateMondayReport} disabled={isSubmitting} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 border border-indigo-500 px-4 py-2 rounded-lg font-bold text-sm transition-colors shadow-sm"><FileText size={18} /> Generate Monday Report</button>
-                        <div className="bg-gray-800 border border-gray-700 px-6 py-2 rounded-lg text-center shadow-inner"><div className="text-xl font-black text-orange-500">{crmTasks.length}</div><div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Tasks</div></div>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div className="space-y-6">
-                        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 shadow-sm">
-                            <h3 className="text-lg font-bold text-blue-900 mb-3 flex items-center gap-2"><Gift size={18}/> Today's Birthdays</h3>
-                            {birthdaysToday.length === 0 ? <p className="text-blue-600 text-sm">No birthdays today.</p> : birthdaysToday.map((p, i) => (<div key={i} className="bg-white p-3 rounded border flex justify-between items-center mb-2"><span className="font-bold text-gray-900">{p.full_name}</span><div className="flex gap-1"><button onClick={() => handleSendMessage(p.phone_number, p.full_name, 'whatsapp', 'birthday')} className="text-xs bg-green-50 text-green-700 px-2 py-1 rounded">WA</button><button onClick={() => handleSendMessage(p.phone_number, p.full_name, 'sms', 'birthday')} className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">SMS</button></div></div>))}
-                        </div>
-                        <div className="bg-green-50 border border-green-200 rounded-xl p-4 shadow-sm">
-                            <h3 className="text-lg font-bold text-green-900 mb-3 flex items-center gap-2"><Sparkles size={18}/> New Guests Follow-Up</h3>
-                            {guestTasks.length === 0 ? <p className="text-green-600 text-sm">All clear.</p> : guestTasks.map((t, i) => (<div key={i} className="bg-white p-3 rounded border flex justify-between items-center mb-2"><div><span className="font-bold">{t.member.full_name}</span><p className="text-xs text-gray-500">{t.type}</p></div><div className="flex gap-1"><button onClick={() => handleSendMessage(t.member.phone_number, t.member.full_name, 'whatsapp', t.msgTemplate)} className="text-xs bg-green-50 p-2 rounded-full"><MessageCircle size={14}/></button></div></div>))}
-                        </div>
-                    </div>
-                    <div className="space-y-6">
-                        <div className="bg-red-50 border border-red-200 rounded-xl p-4 shadow-sm">
-                            <h3 className="text-lg font-bold text-red-900 mb-3 flex items-center gap-2"><UserMinus size={18}/> Urgent: Missing Members</h3>
-                            {urgentMissingTasks.length === 0 ? <p className="text-red-600 text-sm">All clear.</p> : urgentMissingTasks.map((t, i) => (<div key={i} className="bg-white p-3 rounded border flex justify-between items-center mb-2"><div><span className="font-bold">{t.member.full_name}</span><p className="text-xs text-red-500">{t.description}</p></div><div className="flex gap-1"><button onClick={() => handleSendMessage(t.member.phone_number, t.member.full_name, 'whatsapp', t.msgTemplate)} className="text-xs bg-green-50 p-2 rounded-full"><MessageCircle size={14}/></button></div></div>))}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        )}
-
-        {/* --- OTHER VIEWS MINIMIZED FOR STABILITY --- */}
-        {activeView === 'bulk' && isAdmin && (<div className="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-sm border border-gray-200"><button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6"><ArrowLeft size={16} /> Back to Dashboard</button><div className="flex items-center gap-2 mb-4"><Share2 className="text-green-600" size={28} /><h2 className="text-2xl font-bold text-gray-900">Bulk Broadcast Engine</h2></div><p className="text-gray-600 text-sm mb-6">Select a targeted group, verify your script, and broadcast.</p><div className="space-y-5 max-w-2xl"><div><label className="block text-sm font-bold text-gray-700 mb-2">Target Segment</label><div className="flex gap-4">{['Student', 'Men', 'Women'].map(group => (<label key={group} className="flex items-center gap-2 bg-gray-50 border px-4 py-3 rounded-md cursor-pointer flex-1 hover:bg-gray-100"><input type="radio" checked={bulkGroup === group} onChange={() => {setBulkGroup(group); setBulkText(group === 'Student' ? TEMPLATES.bulk_student : TEMPLATES.bulk_men);}} className="w-4 h-4 text-green-600" /><span className="font-semibold text-gray-800">{group} Only</span></label>))}</div></div><div><label className="block text-sm font-bold text-gray-700 mb-1">Announcement Script</label><textarea rows={5} value={bulkText} onChange={(e) => setBulkText(e.target.value)} className="w-full border border-gray-300 rounded-md p-3 font-medium outline-none focus:ring-2 focus:ring-green-500" /></div><div className="flex gap-4 pt-2"><button onClick={() => handleSendBulkMessage('whatsapp')} className="flex-1 bg-green-600 text-white font-bold py-4 rounded-xl shadow hover:bg-green-700 flex justify-center gap-2"><MessageCircle size={22}/> WhatsApp Group</button><button onClick={() => handleSendBulkMessage('sms')} className="flex-1 bg-blue-600 text-white font-bold py-4 rounded-xl shadow hover:bg-blue-700 flex justify-center gap-2"><MessageSquare size={22}/> Bulk SMS</button></div></div></div>)}
+        {/* ... [ALL OTHER VIEWS MINIMIZED FOR STABILITY] ... */}
+        {activeView === 'cell_log' && (<div className="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-sm border"><button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6"><ArrowLeft size={16} /> Back to Dashboard</button><div className="flex items-center gap-2 mb-2"><Home className="text-orange-500" size={28} /><h2 className="text-2xl font-bold">Cell Meeting Report</h2></div><form onSubmit={handleSaveCellMeeting} className="flex flex-col gap-4 max-w-lg mt-6"><div><label className="block text-sm font-medium text-gray-700 mb-1">Cell Group Name</label><input type="text" required value={cellName} onChange={(e) => setCellName(e.target.value)} className="w-full border border-gray-300 rounded-md p-3 focus:border-orange-500" /></div><div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-medium text-gray-700 mb-1">Leader Name</label><input type="text" required value={cellLeader} onChange={(e) => setCellLeader(e.target.value)} className="w-full border border-gray-300 rounded-md p-3" /></div><div><label className="block text-sm font-medium text-gray-700 mb-1">Attendance</label><input type="number" required min="1" value={cellAttendance} onChange={(e) => setCellAttendance(e.target.value)} className="w-full border border-gray-300 rounded-md p-3" /></div></div><div><label className="block text-sm font-medium text-gray-700 mb-1">Meeting Date</label><input type="date" required value={cellDate} onChange={(e) => setCellDate(e.target.value)} className="w-full border border-gray-300 rounded-md p-3" /></div><div><label className="block text-sm font-medium text-gray-700 mb-1">Notes / Testimonies</label><textarea rows={4} value={cellNotes} onChange={(e) => setCellNotes(e.target.value)} className="w-full border border-gray-300 rounded-md p-3" /></div><button type="submit" disabled={isSubmitting} className="bg-gray-900 text-white p-4 rounded-md font-bold mt-2 hover:bg-gray-800">Submit Report</button>{cellStatusMessage && <div className="p-3 bg-green-100 text-green-800 rounded-md text-sm">{cellStatusMessage}</div>}</form></div>)}
+        {activeView === 'tasks' && isAdmin && (<div className="max-w-6xl mx-auto space-y-6"><button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800"><ArrowLeft size={16} /> Back to Dashboard</button><div className="bg-gradient-to-r from-gray-900 to-gray-800 p-6 rounded-xl shadow-md text-white flex flex-col sm:flex-row items-center justify-between gap-4"><div><h2 className="text-2xl font-bold flex items-center gap-2"><ShieldCheck className="text-orange-500"/> Pastoral Command Center</h2></div><div className="flex gap-4"><button onClick={handleGenerateMondayReport} className="flex items-center gap-2 bg-indigo-600 px-4 py-2 rounded-lg font-bold text-sm"><FileText size={18} /> Monday Report</button><div className="bg-gray-800 border px-6 py-2 rounded-lg text-center"><div className="text-xl font-black text-orange-500">{crmTasks.length}</div><div className="text-[10px] text-gray-400">TASKS</div></div></div></div><div className="grid grid-cols-1 lg:grid-cols-2 gap-6"><div className="space-y-6"><div className="bg-blue-50 border border-blue-200 rounded-xl p-4 shadow-sm"><h3 className="text-lg font-bold text-blue-900 mb-3 flex items-center gap-2"><Gift size={18}/> Today's Birthdays</h3>{birthdaysToday.map((p, i) => (<div key={i} className="bg-white p-3 rounded border flex justify-between mb-2"><span className="font-bold">{p.full_name}</span><div className="flex gap-1"><button onClick={() => handleSendMessage(p.phone_number, p.full_name, 'whatsapp', 'birthday')} className="text-xs bg-green-50 text-green-700 px-2 py-1 rounded">WA</button></div></div>))}</div><div className="bg-green-50 border border-green-200 rounded-xl p-4 shadow-sm"><h3 className="text-lg font-bold text-green-900 mb-3 flex items-center gap-2"><Sparkles size={18}/> Guests Follow-Up</h3>{guestTasks.map((t, i) => (<div key={i} className="bg-white p-3 rounded border flex justify-between mb-2"><div><span className="font-bold">{t.member.full_name}</span><p className="text-xs text-gray-500">{t.type}</p></div><button onClick={() => handleSendMessage(t.member.phone_number, t.member.full_name, 'whatsapp', t.msgTemplate)} className="text-xs bg-green-50 p-2 rounded-full"><MessageCircle size={14}/></button></div>))}</div></div><div className="space-y-6"><div className="bg-red-50 border border-red-200 rounded-xl p-4 shadow-sm"><h3 className="text-lg font-bold text-red-900 mb-3 flex items-center gap-2"><UserMinus size={18}/> Urgent: Missing</h3>{urgentMissingTasks.map((t, i) => (<div key={i} className="bg-white p-3 rounded border flex justify-between mb-2"><div><span className="font-bold">{t.member.full_name}</span><p className="text-xs text-red-500">{t.description}</p></div><button onClick={() => handleSendMessage(t.member.phone_number, t.member.full_name, 'whatsapp', t.msgTemplate)} className="text-xs bg-green-50 p-2 rounded-full"><MessageCircle size={14}/></button></div>))}</div></div></div></div>)}
+        {activeView === 'bulk' && isAdmin && (<div className="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-sm border border-gray-200"><button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6"><ArrowLeft size={16} /> Back to Dashboard</button><div className="flex items-center gap-2 mb-4"><Share2 className="text-green-600" size={28} /><h2 className="text-2xl font-bold text-gray-900">Bulk Broadcast Engine</h2></div><div className="space-y-5 max-w-2xl"><div><label className="block text-sm font-bold text-gray-700 mb-2">Target Segment</label><div className="flex gap-4">{['Student', 'Men', 'Women'].map(group => (<label key={group} className="flex items-center gap-2 bg-gray-50 border px-4 py-3 rounded-md cursor-pointer flex-1"><input type="radio" checked={bulkGroup === group} onChange={() => {setBulkGroup(group); setBulkText(group === 'Student' ? TEMPLATES.bulk_student : TEMPLATES.bulk_men);}} className="w-4 h-4 text-green-600" /><span className="font-semibold text-gray-800">{group} Only</span></label>))}</div></div><div><label className="block text-sm font-bold text-gray-700 mb-1">Announcement Script</label><textarea rows={5} value={bulkText} onChange={(e) => setBulkText(e.target.value)} className="w-full border border-gray-300 rounded-md p-3" /></div><div className="flex gap-4"><button onClick={() => handleSendBulkMessage('whatsapp')} className="flex-1 bg-green-600 text-white font-bold py-4 rounded-xl flex justify-center gap-2"><MessageCircle size={22}/> WhatsApp Group</button></div></div></div>)}
         {activeView === 'members' && (<div className="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-sm border"><button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6"><ArrowLeft size={16} /> Back to Dashboard</button><h2 className="text-2xl font-bold mb-4">Registration Form</h2><form onSubmit={handleSaveMember} className="flex flex-col gap-4 max-w-md"><div className="bg-orange-50 p-4 rounded-lg border border-orange-100 mb-2"><label className="block text-sm font-bold text-orange-900 mb-1">Status Profile</label><select value={memberStatus} onChange={(e) => setMemberStatus(e.target.value)} className="w-full border border-orange-300 rounded-md p-2 bg-white"><option value="1st Timer">1st Timer</option><option value="2nd Timer">2nd Timer</option><option value="Student">Student Demographic</option><option value="Regular">Regular Member</option></select></div><div><label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label><input type="text" required value={name} onChange={(e) => setName(e.target.value)} className="w-full border border-gray-300 rounded-md p-2" /></div><div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-medium text-gray-700 mb-1">Gender</label><select value={gender} onChange={(e) => setGender(e.target.value)} className="w-full border border-gray-300 rounded-md p-2 bg-white"><option value="">Select...</option><option value="Male">Male</option><option value="Female">Female</option></select></div><div><label className="block text-sm font-medium text-gray-700 mb-1">Guarded Birthday</label><div className="flex gap-2"><select value={dobMonth} onChange={(e) => setDobMonth(e.target.value)} className="w-1/2 border border-gray-300 rounded-md p-2 bg-white"><option value="">Month</option>{['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map(m => <option key={m} value={m}>{m}</option>)}</select><select value={dobDay} onChange={(e) => setDobDay(e.target.value)} className="w-1/2 border border-gray-300 rounded-md p-2 bg-white"><option value="">Day</option>{[...Array(31)].map((_, i) => <option key={i+1} value={i+1}>{i+1}</option>)}</select></div></div></div><div><label className="block text-sm font-medium text-gray-700 mb-1">Phone</label><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full border border-gray-300 rounded-md p-2" /></div><button type="submit" className="bg-gray-900 text-white px-4 py-3 rounded-md font-medium">Save Registration</button>{statusMessage && <div className="p-3 bg-green-100 text-green-800 rounded-md text-sm">{statusMessage}</div>}</form></div>)}
-        {activeView === 'attendance' && (<div className="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-sm border"><button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6"><ArrowLeft size={16} /> Back to Dashboard</button><div className="flex items-center gap-2 mb-4"><CheckSquare className="text-orange-500" size={24} /><h2 className="text-2xl font-bold">Service Check-In</h2></div><div className="flex flex-col md:flex-row gap-4 mb-6"><div className="flex-1"><label className="block text-sm font-medium text-gray-700 mb-1">Service Date</label><input type="date" value={checkinDate} onChange={(e) => setCheckinDate(e.target.value)} className="w-full border border-gray-300 rounded-md p-2" /></div><div className="flex-[2]"><label className="block text-sm font-medium text-gray-700 mb-1">Quick Search</label><div className="relative"><input type="text" placeholder="Search by name..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full border border-gray-300 rounded-md py-2 px-3" /></div></div></div><div className="border border-gray-200 rounded-lg overflow-hidden mb-4"><div className="max-h-[60vh] overflow-y-auto p-2 bg-white">{memberList.filter(m => m.full_name.toLowerCase().includes(searchTerm.toLowerCase())).map((m, idx) => (<label key={idx} className="flex items-center gap-4 p-4 hover:bg-orange-50 rounded-md cursor-pointer border-b"><input type="checkbox" checked={selectedMembers.includes(m.full_name)} onChange={() => toggleMemberSelection(m.full_name)} className="w-6 h-6 text-orange-500" /><span className="text-gray-800 font-medium select-none text-lg">{m.full_name}</span></label>))}</div></div><button onClick={handleSaveCheckins} className="w-full md:w-auto bg-orange-500 text-white px-8 py-4 rounded-md font-bold text-lg shadow-md">Save Attendance</button>{checkinStatusMessage && <div className="p-4 bg-green-100 text-green-800 rounded-md mt-4">{checkinStatusMessage}</div>}</div>)}
         {activeView === 'absentees' && isAdmin && (<div className="max-w-6xl mx-auto space-y-6"><button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800"><ArrowLeft size={16} /> Back to Dashboard</button><div className="overflow-x-auto border border-gray-200 rounded-xl bg-white p-4"><h3 className="font-bold text-xl mb-4">Smart Absentee Radar Triage</h3>{absenteeList.map((person, idx) => (<div key={idx} className="p-3 border-b flex justify-between items-center"><div><p className="font-bold">{person.full_name} ({person.alertLevel})</p><p className="text-xs text-gray-500">Missed: {person.missedCount} services</p></div><button onClick={() => handleSendMessage(person.phone_number, person.full_name, 'whatsapp', 'checking_in')} className="text-xs bg-green-50 border px-3 py-1 text-green-700 rounded">Message</button></div>))}</div></div>)}
-        {activeView === 'analytics' && isAdmin && (<div className="max-w-6xl mx-auto space-y-6"><button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800"><ArrowLeft size={16} /> Back to Dashboard</button><div className="bg-white p-6 rounded-xl border"><h3 className="font-bold text-lg mb-4">Monthly Trends Chart</h3><div className="flex items-end h-48 border-b-2 gap-4 pb-2">{monthlyChartData.map((d, i) => (<div key={i} className="flex-1 flex flex-col items-center"><div style={{ height: `${(d.total / maxMonthlyTotal) * 100}%` }} className="w-full bg-indigo-500 rounded-t"></div><span className="text-xs text-gray-600 mt-1">{d.monthName.split(' ')[0]}</span></div>))}</div></div></div>)}
+        {activeView === 'analytics' && isAdmin && (<div className="max-w-6xl mx-auto space-y-6"><button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800"><ArrowLeft size={16} /> Back to Dashboard</button><div className="bg-gradient-to-r from-indigo-700 to-purple-800 p-8 rounded-xl shadow-md text-white flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4"><div><h2 className="text-3xl font-bold mb-2 flex items-center gap-3"><TrendingUp size={32} /> Central Analytics Hub</h2></div><div className="flex bg-indigo-900/50 p-1 rounded-lg border border-indigo-600"><button onClick={() => setAnalyticsTab('service')} className={`px-6 py-2 rounded-md font-bold text-sm ${analyticsTab === 'service' ? 'bg-white text-indigo-900' : 'text-indigo-200'}`}>Sunday Services</button><button onClick={() => setAnalyticsTab('cells')} className={`px-6 py-2 rounded-md font-bold text-sm ${analyticsTab === 'cells' ? 'bg-white text-indigo-900' : 'text-indigo-200'}`}>Cell Groups</button></div></div>{analyticsTab === 'service' && (<><div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200"><h3 className="text-xl font-bold text-gray-800 mb-6 border-b pb-4"><BarChart3 className="inline"/> Monthly Growth</h3><div className="flex items-end gap-2 md:gap-6 h-64 mt-8 pb-4 border-b-2 overflow-x-auto">{monthlyChartData.map((data, idx) => { const barHeight = Math.max((data.total / maxMonthlyTotal) * 100, 5); return (<div key={idx} onClick={() => setSelectedMonthData(data)} className="flex flex-col items-center flex-1 min-w-[60px] cursor-pointer"><span className="text-xs font-bold mb-2">{data.total}</span><div style={{ height: `${barHeight}%` }} className="w-full rounded-t-md bg-indigo-600"></div><span className="text-xs mt-3 font-medium">{data.monthName.split(' ')[0]}</span></div>); })}</div></div></>)}{analyticsTab === 'cells' && (<><div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6"><div className="bg-white p-6 rounded-xl border flex items-center gap-4"><div className="bg-blue-100 p-3 rounded-full"><Users size={24} className="text-blue-600"/></div><div><p className="text-sm font-bold">Avg Size</p><p className="text-3xl font-black">{cellStats.overallAvg}</p></div></div><div className="bg-white p-6 rounded-xl border flex items-center gap-4"><div className="bg-yellow-100 p-3 rounded-full">🏆</div><div><p className="text-sm font-bold">Best Cell</p><p className="text-xl font-black">{cellStats.bestCell}</p></div></div><div className="bg-white p-6 rounded-xl border flex items-center gap-4"><div className="bg-green-100 p-3 rounded-full"><Activity size={24} className="text-green-600"/></div><div><p className="text-sm font-bold">Fastest Growth</p><p className="text-xl font-black">{cellStats.fastestGrowing}</p></div></div></div></>)}</div>)}
         {activeView === 'birthdays' && isAdmin && (<div className="max-w-4xl mx-auto space-y-6"><button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800"><ArrowLeft size={16} /> Back to Dashboard</button><div className="bg-white p-4 border rounded-xl"><h3 className="font-bold text-lg mb-4">This Month's Birthdays</h3>{birthdaysMonth.map((p, idx) => <BirthdayRow key={idx} person={p} />)}</div></div>)}
+        {(activeView === 'guests') && (<div className="max-w-6xl mx-auto mb-4 bg-white p-4 rounded-xl shadow-sm border"><h2 className="text-2xl font-bold text-gray-900">Guest Roster</h2><div className="mt-4">{guestList.map((g,i) => (<div key={i} className="p-3 border-b">{g.full_name}</div>))}</div></div>)}
       </main>
     </div>
   );
