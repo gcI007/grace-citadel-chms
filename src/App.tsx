@@ -2,16 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Users, ArrowLeft, Sparkles, Lock, LogOut, Cake, CheckSquare, Search, UserPlus, ClipboardList, UserMinus, BarChart3, ShieldCheck, MessageCircle, MessageSquare, Heart, Gift, TrendingUp, CalendarDays, Share2, FileText, Home, Activity } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
-// 🔥 THE BULLETPROOF LOGO IMPORT 🔥
-// This forces the app to find the image sitting right next to it in the src folder
-import logoUrl from './logo.png';
-
 // --- INITIALIZE SUPABASE ---
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// --- DESIGN SYSTEM: OFFICIAL LOGO ---
 // --- DESIGN SYSTEM: OFFICIAL LOGO ---
 const GraceCrest = ({ className = "w-8 h-8", opacity = 1 }) => (
   <img 
@@ -20,7 +15,6 @@ const GraceCrest = ({ className = "w-8 h-8", opacity = 1 }) => (
     className={`object-contain ${className}`} 
     style={{ opacity }} 
   />
-);
 );
 
 // --- MESSAGE TEMPLATES ---
