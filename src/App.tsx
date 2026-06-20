@@ -10,7 +10,7 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 // --- DESIGN SYSTEM: OFFICIAL LOGO ---
 const GraceCrest = ({ className = "w-8 h-8", opacity = 1 }) => (
   <img 
-    src="https://tijlitzryjdhfebpjrao.supabase.co/storage/v1/object/public/Assets/Logo.png" 
+    src="https://tijlitzryjdhfebpjrao.supabase.co/storage/v1/object/public/Assets/WHITE.png" 
     alt="Grace Citadel Int'l Logo" 
     className={`object-contain ${className}`} 
     style={{ opacity }} 
