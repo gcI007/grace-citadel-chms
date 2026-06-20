@@ -397,7 +397,7 @@ export default function App() {
 
       <header className="bg-[#0B1330] border-b-2 border-[#C8A24D] px-6 py-4 flex items-center justify-between shadow-md relative z-20">
         <div className="flex items-center gap-4 cursor-pointer group" onClick={() => setActiveView('dashboard')}>
-          <GraceCrest className="w-14 h-14 transform group-hover:scale-105 transition-transform" />
+      <GraceCrest className="w-28 h-28 transform group-hover:scale-105 transition-transform" />
           <div>
             <h1 className="text-2xl font-cinzel font-bold text-[#C8A24D] tracking-wide leading-none">Grace Citadel</h1>
           </div>
