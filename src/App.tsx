@@ -12,13 +12,15 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // --- DESIGN SYSTEM: OFFICIAL LOGO ---
+// --- DESIGN SYSTEM: OFFICIAL LOGO ---
 const GraceCrest = ({ className = "w-8 h-8", opacity = 1 }) => (
   <img 
-    src={logoUrl} 
+    src="https://tijlitzryjdhfebpjrao.supabase.co/storage/v1/object/public/Assets/Logo.png" 
     alt="Grace Citadel Int'l Logo" 
     className={`object-contain ${className}`} 
     style={{ opacity }} 
   />
+);
 );
 
 // --- MESSAGE TEMPLATES ---
