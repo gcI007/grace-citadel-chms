@@ -37,7 +37,7 @@ export default function App() {
   const [absenteeList, setAbsenteeList] = useState<any[]>([]);
   const [crmTasks, setCrmTasks] = useState<any[]>([]);
 
-  // --- NEW: VISUAL ANALYTICS STATES ---
+  // --- VISUAL ANALYTICS STATES ---
   const [monthlyChartData, setMonthlyChartData] = useState<any[]>([]);
   const [selectedMonthData, setSelectedMonthData] = useState<any | null>(null);
   const [memberStats, setMemberStats] = useState<any[]>([]);
@@ -121,47 +121,80 @@ export default function App() {
   const fetchMembersForCheckin = async () => { const { data } = await supabase.from('members').select('full_name').order('full_name'); if (data) setMemberList(data); };
   const fetchGuests = async () => { const { data } = await supabase.from('members').select('*').in('status', ['1st Timer', '2nd Timer']).order('created_at', { ascending: false }); if (data) setGuestList(data); };
   
-  // --- 🔥 NEW: VISUAL ANALYTICS ENGINE 🔥 ---
   const fetchAnalytics = async () => { 
     const { data } = await supabase.from('member_checkins').select('*'); 
     if (data) { 
-      // 1. Group By Month & Build Drill-Down Data
       const monthMap: any = {};
-      
       data.forEach(checkin => {
         const dateObj = new Date(checkin.service_date);
-        // Format as "January 2026"
         const monthKey = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
-        
-        if (!monthMap[monthKey]) {
-            monthMap[monthKey] = { monthName: monthKey, total: 0, sortDate: dateObj.getTime(), services: {} };
-        }
-        
+        if (!monthMap[monthKey]) monthMap[monthKey] = { monthName: monthKey, total: 0, sortDate: dateObj.getTime(), services: {} };
         monthMap[monthKey].total += 1;
-        
-        if (!monthMap[monthKey].services[checkin.service_date]) {
-            monthMap[monthKey].services[checkin.service_date] = 0;
-        }
+        if (!monthMap[monthKey].services[checkin.service_date]) monthMap[monthKey].services[checkin.service_date] = 0;
         monthMap[monthKey].services[checkin.service_date] += 1;
       });
-
-      // Convert to array and sort chronologically (oldest to newest for the chart)
       const formattedMonths = Object.values(monthMap).sort((a: any, b: any) => a.sortDate - b.sortDate);
       setMonthlyChartData(formattedMonths);
-
-      // 2. Member Consistency Leaderboard
       const memberCounts = data.reduce((acc: any, curr: any) => { acc[curr.member_name] = (acc[curr.member_name] || 0) + 1; return acc; }, {}); 
       setMemberStats(Object.keys(memberCounts).map(name => ({ name, count: memberCounts[name] })).sort((a, b) => b.count - a.count)); 
     } 
   };
   
+  // --- 🔥 NEW: SMART ABSENTEE DETECTION ENGINE 🔥 ---
   const fetchAbsentees = async () => {
-    const cutoffDate = new Date(new Date().setDate(new Date().getDate() - 14)).toISOString().split('T')[0];
     const { data: allMembers } = await supabase.from('members').select('*').order('full_name');
-    const { data: recentCheckins } = await supabase.from('member_checkins').select('member_name').gte('service_date', cutoffDate);
-    if (allMembers && recentCheckins) {
-      const recentAttendees = new Set(recentCheckins.map(c => c.member_name));
-      setAbsenteeList(allMembers.filter(m => !recentAttendees.has(m.full_name)));
+    const { data: allCheckins } = await supabase.from('member_checkins').select('*');
+
+    if (allMembers && allCheckins) {
+      // Get chronological list of all service dates the church has had
+      const globalServiceDates = [...new Set(allCheckins.map(c => c.service_date))].sort();
+
+      // Map out the last time everyone checked in
+      const lastCheckinMap: any = {};
+      allCheckins.forEach(c => {
+        if (!lastCheckinMap[c.member_name] || c.service_date > lastCheckinMap[c.member_name]) {
+          lastCheckinMap[c.member_name] = c.service_date;
+        }
+      });
+
+      const smartAbsentees: any[] = [];
+
+      allMembers.forEach(member => {
+        let missedCount = 0;
+        const lastCheckin = lastCheckinMap[member.full_name];
+
+        if (lastCheckin) {
+          // Count services that happened AFTER their last checkin
+          missedCount = globalServiceDates.filter(date => date > lastCheckin).length;
+        } else {
+          // If never checked in, count services that happened AFTER they were registered
+          const createdDate = new Date(member.created_at || new Date()).toISOString().split('T')[0];
+          missedCount = globalServiceDates.filter(date => date >= createdDate).length;
+        }
+
+        // Apply Triage Rules
+        if (missedCount >= 2) {
+          let alertLevel = 'Yellow Alert';
+          let colorClass = 'bg-yellow-100 text-yellow-800 border-yellow-300';
+          let icon = '🟡';
+
+          if (missedCount >= 8) {
+            alertLevel = 'Red Alert';
+            colorClass = 'bg-red-100 text-red-800 border-red-300';
+            icon = '🚨';
+          } else if (missedCount >= 4) {
+            alertLevel = 'Orange Alert';
+            colorClass = 'bg-orange-100 text-orange-800 border-orange-300';
+            icon = '🟧';
+          }
+
+          smartAbsentees.push({ ...member, missedCount, alertLevel, colorClass, icon });
+        }
+      });
+
+      // Sort so RED alerts are at the very top of the list
+      smartAbsentees.sort((a, b) => b.missedCount - a.missedCount);
+      setAbsenteeList(smartAbsentees);
     }
   };
 
@@ -172,7 +205,7 @@ export default function App() {
 
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const sortedDates = [...new Set(checkins.map(c => c.service_date))].sort();
-    const lastGlobalServiceDate = sortedDates[sortedDates.length - 1];
+    
     const lastCheckinMap: any = {};
     checkins.forEach(c => { if (!lastCheckinMap[c.member_name] || c.service_date > lastCheckinMap[c.member_name]) lastCheckinMap[c.member_name] = c.service_date; });
 
@@ -181,13 +214,31 @@ export default function App() {
       const createdDate = new Date(member.created_at || today); createdDate.setHours(0, 0, 0, 0);
       const daysSinceCreated = Math.floor((today.getTime() - createdDate.getTime()) / (1000 * 3600 * 24));
       const lastCheckinStr = lastCheckinMap[member.full_name];
-      let daysSinceLastCheckin = -1;
-      if (lastCheckinStr) { const lastCheckin = new Date(lastCheckinStr); lastCheckin.setHours(0, 0, 0, 0); daysSinceLastCheckin = Math.floor((today.getTime() - lastCheckin.getTime()) / (1000 * 3600 * 24)); }
+      
+      // Calculate missed services for CRM rules
+      let missedCount = 0;
+      if (lastCheckinStr) {
+        missedCount = sortedDates.filter(date => date > lastCheckinStr).length;
+      } else {
+        const createdStr = createdDate.toISOString().split('T')[0];
+        missedCount = sortedDates.filter(date => date >= createdStr).length;
+      }
 
-      if (member.status === '1st Timer' && daysSinceCreated >= 1 && daysSinceCreated <= 3) newTasks.push({ priority: 1, type: 'Day 2 Follow-Up', color: 'bg-green-100 text-green-800', member, description: 'New guest! Send a warm welcome message.', msgTemplate: 'welcome' });
-      else if (member.status === '1st Timer' && daysSinceCreated >= 7 && daysSinceCreated <= 10 && (daysSinceLastCheckin === -1 || daysSinceLastCheckin >= 7)) newTasks.push({ priority: 1, type: 'Day 8 (Not Seen)', color: 'bg-red-100 text-red-800', member, description: 'Did not return for week 2. Reach out!', msgTemplate: 'missed' });
-      else if (daysSinceLastCheckin >= 14 && daysSinceLastCheckin <= 20) newTasks.push({ priority: 2, type: '14 Days Absent', color: 'bg-orange-100 text-orange-800', member, description: 'Has not attended in over 2 weeks.', msgTemplate: 'checking_in' });
-      else if (member.status === 'Regular' && lastGlobalServiceDate && lastCheckinStr !== lastGlobalServiceDate && daysSinceLastCheckin > 0 && daysSinceLastCheckin < 14) newTasks.push({ priority: 3, type: 'Missed Last Service', color: 'bg-blue-100 text-blue-800', member, description: 'Was absent this past Sunday.', msgTemplate: 'missed' });
+      // Guest Follow-Up Rules
+      if (member.status === '1st Timer' && daysSinceCreated >= 1 && daysSinceCreated <= 3) {
+        newTasks.push({ priority: 1, type: 'Day 2 Follow-Up', color: 'bg-green-100 text-green-800', member, description: 'New guest! Send a warm welcome message.', msgTemplate: 'welcome' });
+      } else if (member.status === '1st Timer' && missedCount >= 1 && daysSinceCreated >= 7) {
+        newTasks.push({ priority: 2, type: 'Guest Check-In', color: 'bg-yellow-100 text-yellow-800', member, description: 'Did not return for their second week. Reach out!', msgTemplate: 'missed' });
+      }
+      
+      // Smart Absentee Rules (Regulars & General)
+      if (missedCount >= 8) {
+        newTasks.push({ priority: 3, type: '🚨 RED ALERT', color: 'bg-red-100 text-red-800', member, description: `Has missed ${missedCount} services. Urgent pastoral care needed.`, msgTemplate: 'checking_in' });
+      } else if (missedCount >= 4) {
+        newTasks.push({ priority: 4, type: '🟧 ORANGE ALERT', color: 'bg-orange-100 text-orange-800', member, description: `Has missed ${missedCount} services. Needs follow-up.`, msgTemplate: 'checking_in' });
+      } else if (missedCount >= 2 && member.status === 'Regular') {
+        newTasks.push({ priority: 5, type: '🟡 YELLOW ALERT', color: 'bg-yellow-100 text-yellow-800', member, description: `Missed ${missedCount} services. Send a quick "missed you" text.`, msgTemplate: 'missed' });
+      }
     });
 
     newTasks.sort((a, b) => a.priority - b.priority); setCrmTasks(newTasks);
@@ -269,7 +320,6 @@ export default function App() {
     );
   }
 
-  // --- Calculate Chart Maximums ---
   const maxMonthlyTotal = monthlyChartData.length > 0 ? Math.max(...monthlyChartData.map(d => d.total)) : 1;
 
   // ==========================================
@@ -297,7 +347,6 @@ export default function App() {
           <div className="max-w-7xl mx-auto space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               
-              {/* EVERYONE SEES THESE */}
               <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
                 <h2 className="text-lg font-semibold mb-2 text-gray-900 flex items-center gap-2"><CheckSquare size={18} className="text-orange-500"/> Check-In</h2>
                 <p className="text-gray-500 text-sm mb-4">Track which members attended service.</p>
@@ -310,7 +359,6 @@ export default function App() {
                 <button onClick={() => {setActiveView('members'); setStatusMessage('');}} className="text-blue-600 font-medium text-sm hover:underline">Open Form &rarr;</button>
               </div>
 
-              {/* ADMIN ONLY CARDS */}
               {isAdmin && (
                 <>
                   <div className="bg-gradient-to-br from-indigo-50 to-purple-50 p-6 rounded-xl shadow-sm border border-indigo-200 hover:shadow-md transition-shadow">
@@ -333,7 +381,13 @@ export default function App() {
                       <button onClick={() => setActiveView('tasks')} className="text-orange-600 font-bold text-sm hover:underline">Open Workflow &rarr;</button>
                   </div>
 
-                  <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow"><h2 className="text-lg font-semibold mb-2 text-red-700 flex items-center gap-2"><UserMinus size={18} className="text-red-600"/> Absentee Alert</h2><p className="text-gray-500 text-sm mb-4">See members missing for 2 weeks or more.</p><button onClick={() => setActiveView('absentees')} className="text-red-600 font-medium text-sm hover:underline">View Missing &rarr;</button></div>
+                  {/* UPDATED ABSENTEE RADAR CARD */}
+                  <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
+                      <h2 className="text-lg font-semibold mb-2 text-red-700 flex items-center gap-2"><UserMinus size={18} className="text-red-600"/> Smart Absentee Radar</h2>
+                      <p className="text-gray-500 text-sm mb-4">Color-coded alerts for missed services (Yellow, Orange, Red).</p>
+                      <button onClick={() => setActiveView('absentees')} className="text-red-600 font-medium text-sm hover:underline">View Radar Triage &rarr;</button>
+                  </div>
+
                   <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow"><h2 className="text-lg font-semibold mb-2 text-gray-900 flex items-center gap-2"><ClipboardList size={18} className="text-orange-500"/> Guest Roster</h2><p className="text-gray-500 text-sm mb-4">View 1st and 2nd Timer details for follow-up.</p><button onClick={() => setActiveView('guests')} className="text-blue-600 font-medium text-sm hover:underline">View Guests &rarr;</button></div>
                   <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow"><h2 className="text-lg font-semibold mb-2 text-gray-900 flex items-center gap-2"><Sparkles size={18} className="text-orange-500"/> AI Outreach</h2><p className="text-gray-500 text-sm mb-4">Draft personalized messages using Gemini.</p><button onClick={() => setActiveView('outreach')} className="text-blue-600 font-medium text-sm hover:underline">Draft Message &rarr;</button></div>
                 </>
@@ -342,126 +396,90 @@ export default function App() {
           </div>
         )}
 
-        {/* --- 🔥 NEW: VISUAL ANALYTICS DASHBOARD 🔥 --- */}
-        {activeView === 'analytics' && isAdmin && (
+        {/* --- 🔥 NEW: SMART ABSENTEE RADAR VIEW 🔥 --- */}
+        {activeView === 'absentees' && isAdmin && (
           <div className="max-w-6xl mx-auto space-y-6">
             <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800"><ArrowLeft size={16} /> Back to Dashboard</button>
             
-            <div className="bg-gradient-to-r from-indigo-700 to-purple-800 p-8 rounded-xl shadow-md text-white flex items-center justify-between mb-8">
+            <div className="bg-gradient-to-r from-red-600 to-orange-600 p-8 rounded-xl shadow-md text-white flex items-center justify-between mb-2">
                 <div>
-                    <h2 className="text-3xl font-bold mb-2 flex items-center gap-3"><TrendingUp size={32} /> Service Analytics Dashboard</h2>
-                    <p className="text-indigo-200">Track monthly trends, measure service attendance, and identify church growth patterns.</p>
+                    <h2 className="text-3xl font-bold mb-2 flex items-center gap-3"><UserMinus size={32} /> Smart Absentee Radar</h2>
+                    <p className="text-red-100">Automatically tracks missed services to prioritize pastoral care and follow-ups.</p>
                 </div>
             </div>
 
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                <h3 className="text-xl font-bold text-gray-800 mb-6 border-b pb-4 flex items-center gap-2"><BarChart3 className="text-indigo-600"/> Monthly Growth Trend</h3>
-                
-                {/* THE VISUAL CSS BAR CHART */}
-                {monthlyChartData.length === 0 ? (
-                    <div className="text-center p-12 text-gray-500 bg-gray-50 rounded-lg">No attendance data recorded yet.</div>
-                ) : (
-                    <div className="flex items-end gap-2 md:gap-6 h-64 mt-8 pb-4 border-b-2 border-gray-100 overflow-x-auto">
-                        {monthlyChartData.map((data, idx) => {
-                            const barHeight = Math.max((data.total / maxMonthlyTotal) * 100, 5); // min 5% height
-                            const isSelected = selectedMonthData?.monthName === data.monthName;
-                            
-                            return (
-                                <div key={idx} onClick={() => setSelectedMonthData(data)} className="flex flex-col items-center flex-1 min-w-[60px] group cursor-pointer">
-                                    {/* Tooltip / Label above bar */}
-                                    <span className={`text-xs font-bold mb-2 transition-colors ${isSelected ? 'text-indigo-700 scale-110' : 'text-gray-400 group-hover:text-indigo-500'}`}>
-                                        {data.total}
-                                    </span>
-                                    {/* The Dynamic Bar */}
-                                    <div 
-                                        style={{ height: `${barHeight}%` }} 
-                                        className={`w-full rounded-t-md transition-all duration-300 ${isSelected ? 'bg-indigo-600 shadow-lg' : 'bg-indigo-200 group-hover:bg-indigo-400'}`}
-                                    ></div>
-                                    {/* Month Label */}
-                                    <span className={`text-xs mt-3 whitespace-nowrap font-medium ${isSelected ? 'text-indigo-900' : 'text-gray-500'}`}>
-                                        {data.monthName.split(' ')[0]} {/* e.g. January */}
-                                    </span>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
+            <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="bg-white p-4 rounded-lg border border-yellow-300 text-center shadow-sm">
+                    <div className="text-2xl font-black text-yellow-500 mb-1">🟡</div>
+                    <div className="text-sm font-bold text-gray-800">Yellow Alert</div>
+                    <div className="text-xs text-gray-500">Missed 2+ Services</div>
+                </div>
+                <div className="bg-white p-4 rounded-lg border border-orange-300 text-center shadow-sm">
+                    <div className="text-2xl font-black text-orange-500 mb-1">🟧</div>
+                    <div className="text-sm font-bold text-gray-800">Orange Alert</div>
+                    <div className="text-xs text-gray-500">Missed 4+ Services</div>
+                </div>
+                <div className="bg-white p-4 rounded-lg border border-red-300 text-center shadow-sm">
+                    <div className="text-2xl font-black text-red-500 mb-1">🚨</div>
+                    <div className="text-sm font-bold text-gray-800">Red Alert</div>
+                    <div className="text-xs text-gray-500">Missed 8+ Services</div>
+                </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* DRILL-DOWN: INDIVIDUAL SERVICES FOR SELECTED MONTH */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                    <div className="bg-indigo-50 p-4 border-b border-indigo-100">
-                        <h3 className="text-lg font-bold text-indigo-900 flex items-center gap-2">
-                            <CalendarDays size={20} className="text-indigo-600"/> 
-                            {selectedMonthData ? `Service Breakdown: ${selectedMonthData.monthName}` : 'Select a month to see breakdown'}
-                        </h3>
-                    </div>
-                    
-                    <div className="p-0">
-                        {!selectedMonthData ? (
-                            <div className="p-12 text-center text-gray-500">Click a bar on the chart above to view individual service numbers for that month.</div>
+            <div className="overflow-x-auto border border-gray-200 rounded-xl bg-white shadow-sm">
+                <table className="w-full text-left border-collapse">
+                    <thead>
+                        <tr className="bg-gray-50 border-b border-gray-200 text-sm font-semibold text-gray-700">
+                            <th className="p-4">Member Profile</th>
+                            <th className="p-4">Missed Count</th>
+                            <th className="p-4">Triage Status</th>
+                            <th className="p-4">Quick Actions</th>
+                            <th className="p-4">AI Drafter</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                        {absenteeList.length === 0 ? (
+                            <tr><td colSpan={5} className="p-8 text-center text-gray-500 font-medium text-lg">Amazing! Everyone is accounted for.</td></tr>
                         ) : (
-                            <table className="w-full text-left border-collapse">
-                                <thead>
-                                    <tr className="bg-gray-50 border-b text-sm text-gray-600">
-                                        <th className="p-4 font-semibold">Service Date</th>
-                                        <th className="p-4 font-semibold">Total Attendance</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                    {Object.entries(selectedMonthData.services).sort().map(([date, count]: [string, any], idx) => (
-                                        <tr key={idx} className="hover:bg-indigo-50 transition-colors">
-                                            <td className="p-4 font-medium text-gray-900">{new Date(date).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</td>
-                                            <td className="p-4 font-bold text-indigo-700">{count} members</td>
-                                        </tr>
-                                    ))}
-                                    <tr className="bg-indigo-600 text-white font-bold">
-                                        <td className="p-4 text-right uppercase text-xs tracking-wider">Monthly Total</td>
-                                        <td className="p-4 text-xl">{selectedMonthData.total}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                            absenteeList.map((person, idx) => (
+                                <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                                    <td className="p-4">
+                                        <div className="font-bold text-gray-900 text-lg">{person.full_name}</div>
+                                        <div className="text-gray-500 text-sm">{person.phone_number || 'No Phone'}</div>
+                                    </td>
+                                    <td className="p-4 font-black text-gray-700 text-xl">{person.missedCount} <span className="text-sm font-medium text-gray-500">services</span></td>
+                                    <td className="p-4">
+                                        <span className={`px-3 py-1.5 rounded-full text-xs font-bold border flex items-center gap-2 w-max ${person.colorClass}`}>
+                                            {person.icon} {person.alertLevel}
+                                        </span>
+                                    </td>
+                                    <td className="p-4">
+                                        <div className="flex items-center gap-2">
+                                            <button onClick={() => handleSendMessage(person.phone_number, person.full_name, 'whatsapp', person.missedCount >= 8 ? 'checking_in' : 'missed')} className="text-green-600 hover:bg-green-100 p-2 rounded-full transition-colors" title="Send WhatsApp"><MessageCircle size={20} /></button>
+                                            <button onClick={() => handleSendMessage(person.phone_number, person.full_name, 'sms', person.missedCount >= 8 ? 'checking_in' : 'missed')} className="text-blue-600 hover:bg-blue-100 p-2 rounded-full transition-colors" title="Send SMS"><MessageSquare size={20} /></button>
+                                        </div>
+                                    </td>
+                                    <td className="p-4">
+                                        <button onClick={() => {setActiveView('outreach'); setPromptContext(`Draft a highly empathetic and pastoral check-in message for ${person.full_name} who has missed ${person.missedCount} church services. We want them to know they are deeply loved and missed, without sounding condemning.`);}} className="text-xs bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded hover:bg-gray-100 font-medium transition-colors">
+                                            Custom AI Draft
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))
                         )}
-                    </div>
-                </div>
-
-                {/* CONSISTENCY LEADERBOARD */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                    <div className="bg-gray-50 p-4 border-b border-gray-200">
-                        <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2"><Users size={20} className="text-orange-500"/> Consistency Leaderboard</h3>
-                    </div>
-                    <div className="max-h-[400px] overflow-y-auto">
-                        <table className="w-full text-left border-collapse">
-                            <thead><tr className="bg-white border-b text-sm text-gray-600 sticky top-0 shadow-sm"><th className="p-4 font-semibold">Member Name</th><th className="p-4 font-semibold">Total Services Attended</th></tr></thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {memberStats.length === 0 ? (<tr><td colSpan={2} className="p-4 text-center text-gray-500">No attendance data yet.</td></tr>) : (
-                                    memberStats.map((member, idx) => (
-                                        <tr key={idx} className="hover:bg-orange-50">
-                                            <td className="p-4 font-medium text-gray-900 flex items-center gap-2">
-                                                {idx < 3 && <span className="text-lg" title={`Top ${idx+1}`}>🏆</span>}
-                                                {member.name}
-                                            </td>
-                                            <td className="p-4 font-bold text-orange-600">{member.count}x</td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                    </tbody>
+                </table>
             </div>
           </div>
         )}
 
-        {/* ... [ALL OTHER EXISTING VIEWS - BIRTHDAYS, TASKS, GUESTS, ABSENTEES, OUTREACH, REGISTRATION, CHECK-IN] ... */}
-        {/* TEMPLATE SELECTOR */}
-        {(activeView === 'guests' || activeView === 'absentees') && (<div className="max-w-6xl mx-auto mb-4 bg-white p-4 rounded-xl shadow-sm border flex flex-col sm:flex-row items-start sm:items-center gap-4"><label className="font-semibold text-gray-800">Quick Message Template:</label><select value={template} onChange={(e) => setTemplate(e.target.value)} className="border border-gray-300 rounded-md p-2 flex-1 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500"><option value="welcome">👋 Welcome Guest Message</option><option value="missed">❤️ We Missed You Message</option><option value="checking_in">👀 Checking In (Absentee)</option><option value="birthday">🎂 Birthday Blessing</option></select></div>)}
+        {/* ... [ALL OTHER EXISTING VIEWS REMAIN FULLY INTACT] ... */}
+        {(activeView === 'guests') && (<div className="max-w-6xl mx-auto mb-4 bg-white p-4 rounded-xl shadow-sm border flex flex-col sm:flex-row items-start sm:items-center gap-4"><label className="font-semibold text-gray-800">Quick Message Template:</label><select value={template} onChange={(e) => setTemplate(e.target.value)} className="border border-gray-300 rounded-md p-2 flex-1 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500"><option value="welcome">👋 Welcome Guest Message</option><option value="missed">❤️ We Missed You Message</option><option value="checking_in">👀 Checking In (Absentee)</option><option value="birthday">🎂 Birthday Blessing</option></select></div>)}
         
+        {activeView === 'analytics' && isAdmin && (<div className="max-w-6xl mx-auto space-y-6"><button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800"><ArrowLeft size={16} /> Back to Dashboard</button><div className="bg-gradient-to-r from-indigo-700 to-purple-800 p-8 rounded-xl shadow-md text-white flex items-center justify-between mb-8"><div><h2 className="text-3xl font-bold mb-2 flex items-center gap-3"><TrendingUp size={32} /> Service Analytics Dashboard</h2><p className="text-indigo-200">Track monthly trends, measure service attendance, and identify church growth patterns.</p></div></div><div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200"><h3 className="text-xl font-bold text-gray-800 mb-6 border-b pb-4 flex items-center gap-2"><BarChart3 className="text-indigo-600"/> Monthly Growth Trend</h3>{monthlyChartData.length === 0 ? (<div className="text-center p-12 text-gray-500 bg-gray-50 rounded-lg">No attendance data recorded yet.</div>) : (<div className="flex items-end gap-2 md:gap-6 h-64 mt-8 pb-4 border-b-2 border-gray-100 overflow-x-auto">{monthlyChartData.map((data, idx) => { const barHeight = Math.max((data.total / maxMonthlyTotal) * 100, 5); const isSelected = selectedMonthData?.monthName === data.monthName; return (<div key={idx} onClick={() => setSelectedMonthData(data)} className="flex flex-col items-center flex-1 min-w-[60px] group cursor-pointer"><span className={`text-xs font-bold mb-2 transition-colors ${isSelected ? 'text-indigo-700 scale-110' : 'text-gray-400 group-hover:text-indigo-500'}`}>{data.total}</span><div style={{ height: `${barHeight}%` }} className={`w-full rounded-t-md transition-all duration-300 ${isSelected ? 'bg-indigo-600 shadow-lg' : 'bg-indigo-200 group-hover:bg-indigo-400'}`}></div><span className={`text-xs mt-3 whitespace-nowrap font-medium ${isSelected ? 'text-indigo-900' : 'text-gray-500'}`}>{data.monthName.split(' ')[0]}</span></div>); })}</div>)}</div><div className="grid grid-cols-1 lg:grid-cols-2 gap-6"><div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"><div className="bg-indigo-50 p-4 border-b border-indigo-100"><h3 className="text-lg font-bold text-indigo-900 flex items-center gap-2"><CalendarDays size={20} className="text-indigo-600"/> {selectedMonthData ? `Service Breakdown: ${selectedMonthData.monthName}` : 'Select a month to see breakdown'}</h3></div><div className="p-0">{!selectedMonthData ? (<div className="p-12 text-center text-gray-500">Click a bar on the chart above to view individual service numbers for that month.</div>) : (<table className="w-full text-left border-collapse"><thead><tr className="bg-gray-50 border-b text-sm text-gray-600"><th className="p-4 font-semibold">Service Date</th><th className="p-4 font-semibold">Total Attendance</th></tr></thead><tbody className="divide-y divide-gray-100">{Object.entries(selectedMonthData.services).sort().map(([date, count]: [string, any], idx) => (<tr key={idx} className="hover:bg-indigo-50 transition-colors"><td className="p-4 font-medium text-gray-900">{new Date(date).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</td><td className="p-4 font-bold text-indigo-700">{count} members</td></tr>))}<tr className="bg-indigo-600 text-white font-bold"><td className="p-4 text-right uppercase text-xs tracking-wider">Monthly Total</td><td className="p-4 text-xl">{selectedMonthData.total}</td></tr></tbody></table>)}</div></div><div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"><div className="bg-gray-50 p-4 border-b border-gray-200"><h3 className="text-lg font-bold text-gray-900 flex items-center gap-2"><Users size={20} className="text-orange-500"/> Consistency Leaderboard</h3></div><div className="max-h-[400px] overflow-y-auto"><table className="w-full text-left border-collapse"><thead><tr className="bg-white border-b text-sm text-gray-600 sticky top-0 shadow-sm"><th className="p-4 font-semibold">Member Name</th><th className="p-4 font-semibold">Total Services Attended</th></tr></thead><tbody className="divide-y divide-gray-100">{memberStats.length === 0 ? (<tr><td colSpan={2} className="p-4 text-center text-gray-500">No attendance data yet.</td></tr>) : (memberStats.map((member, idx) => (<tr key={idx} className="hover:bg-orange-50"><td className="p-4 font-medium text-gray-900 flex items-center gap-2">{idx < 3 && <span className="text-lg" title={`Top ${idx+1}`}>🏆</span>}{member.name}</td><td className="p-4 font-bold text-orange-600">{member.count}x</td></tr>)))}</tbody></table></div></div></div></div>)}
         {activeView === 'birthdays' && isAdmin && (<div className="max-w-4xl mx-auto space-y-6"><button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800"><ArrowLeft size={16} /> Back to Dashboard</button><div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-8 rounded-xl shadow-md text-white flex items-center justify-between"><div><h2 className="text-3xl font-bold mb-2 flex items-center gap-3"><Cake size={32} /> Birthday Management</h2><p className="text-blue-100">Send blessings, celebrate milestones, and manage upcoming birthdays.</p></div></div><div className="bg-white rounded-xl shadow-sm border border-blue-200 overflow-hidden"><div className="bg-blue-50 border-b border-blue-200 p-4 font-bold text-blue-900 flex items-center gap-2 text-lg"><span>🎂</span> Today's Birthdays</div><div>{birthdaysToday.length === 0 ? (<div className="p-6 text-center text-gray-500">No birthdays today.</div>) : (birthdaysToday.map((person, idx) => <BirthdayRow key={idx} person={person} />))}</div></div><div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"><div className="bg-gray-50 border-b border-gray-200 p-4 font-bold text-gray-800 flex items-center gap-2 text-lg"><span>🎉</span> This Week's Birthdays (Next 7 Days)</div><div>{birthdaysWeek.length === 0 ? (<div className="p-6 text-center text-gray-500">No upcoming birthdays this week.</div>) : (birthdaysWeek.map((person, idx) => <BirthdayRow key={idx} person={person} />))}</div></div><div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"><div className="bg-gray-50 border-b border-gray-200 p-4 font-bold text-gray-800 flex items-center gap-2 text-lg"><span>🗓️</span> Later This Month</div><div>{birthdaysMonth.length === 0 ? (<div className="p-6 text-center text-gray-500">No other birthdays later this month.</div>) : (birthdaysMonth.map((person, idx) => <BirthdayRow key={idx} person={person} />))}</div></div></div>)}
         {activeView === 'tasks' && isAdmin && (<div className="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-sm border"><button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6"><ArrowLeft size={16} /> Back to Dashboard</button><div className="flex items-center justify-between mb-6"><div className="flex items-center gap-2"><Heart className="text-orange-500" size={28} /><h2 className="text-2xl font-bold text-gray-900">Follow-Up Workflow</h2></div><span className="bg-orange-100 text-orange-800 px-4 py-1 rounded-full text-sm font-bold">{crmTasks.length} Pending Tasks</span></div><p className="text-gray-600 mb-6">These tasks are automatically generated based on member registration and attendance patterns. Click the message icons to instantly send the appropriate template.</p><div className="space-y-4">{crmTasks.length === 0 ? (<div className="text-center p-8 bg-gray-50 rounded-lg text-gray-500">Amazing! Your follow-up queue is completely empty.</div>) : (crmTasks.map((task, idx) => (<div key={idx} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4"><div><div className="flex items-center gap-3 mb-1"><h3 className="font-bold text-gray-900 text-lg">{task.member.full_name}</h3><span className={`text-xs font-bold px-2 py-1 rounded ${task.color}`}>{task.type}</span></div><p className="text-gray-600 text-sm">{task.description}</p><p className="text-gray-400 text-xs mt-1">Phone: {task.member.phone_number || 'N/A'}</p></div><div className="flex items-center gap-3 shrink-0"><button onClick={() => handleSendMessage(task.member.phone_number, task.member.full_name, 'whatsapp', task.msgTemplate)} className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 px-4 py-2 rounded-md hover:bg-green-100 font-medium transition-colors"><MessageCircle size={18}/> WhatsApp</button><button onClick={() => handleSendMessage(task.member.phone_number, task.member.full_name, 'sms', task.msgTemplate)} className="flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 px-4 py-2 rounded-md hover:bg-blue-100 font-medium transition-colors"><MessageSquare size={18}/> SMS</button></div></div>)))}</div></div>)}
         {activeView === 'guests' && isAdmin && (<div className="max-w-6xl mx-auto bg-white p-6 rounded-xl shadow-sm border"><button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6"><ArrowLeft size={16} /> Back to Dashboard</button><div className="flex items-center gap-2 mb-4"><ClipboardList className="text-orange-500" size={24} /><h2 className="text-2xl font-bold">Guest Follow-Up Roster</h2></div><div className="overflow-x-auto border border-gray-200 rounded-lg"><table className="w-full text-left border-collapse"><thead><tr className="bg-gray-50 border-b border-gray-200 text-sm font-semibold text-gray-700"><th className="p-4">Name</th><th className="p-4">Status</th><th className="p-4">Phone</th><th className="p-4">Send Message</th></tr></thead><tbody className="divide-y divide-gray-200">{guestList.length === 0 ? (<tr><td colSpan={4} className="p-6 text-center text-gray-500">No guests found.</td></tr>) : (guestList.map((guest, idx) => (<tr key={idx} className="hover:bg-orange-50"><td className="p-4 font-medium text-gray-900">{guest.full_name}</td><td className="p-4"><span className={`px-3 py-1 rounded-full text-xs font-bold ${guest.status === '1st Timer' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}`}>{guest.status}</span></td><td className="p-4 text-gray-600">{guest.phone_number || '-'}</td><td className="p-4"><div className="flex items-center gap-3"><button onClick={() => handleSendMessage(guest.phone_number, guest.full_name, 'whatsapp')} className="text-green-600 hover:bg-green-100 p-2 rounded-full transition-colors" title="Send WhatsApp"><MessageCircle size={20} /></button><button onClick={() => handleSendMessage(guest.phone_number, guest.full_name, 'sms')} className="text-blue-600 hover:bg-blue-100 p-2 rounded-full transition-colors" title="Send SMS"><MessageSquare size={20} /></button></div></td></tr>)))}</tbody></table></div></div>)}
-        {activeView === 'absentees' && isAdmin && (<div className="max-w-6xl mx-auto bg-white p-6 rounded-xl shadow-sm border"><button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6"><ArrowLeft size={16} /> Back to Dashboard</button><div className="flex items-center gap-2 mb-4"><UserMinus className="text-red-600" size={24} /><h2 className="text-2xl font-bold text-red-700">Absentee Alert (14+ Days)</h2></div><div className="overflow-x-auto border border-red-200 rounded-lg"><table className="w-full text-left border-collapse"><thead><tr className="bg-red-50 border-b border-red-200 text-sm font-semibold text-red-800"><th className="p-4">Name</th><th className="p-4">Phone Number</th><th className="p-4">Send Message</th><th className="p-4">AI Drafter</th></tr></thead><tbody className="divide-y divide-gray-200">{absenteeList.length === 0 ? (<tr><td colSpan={4} className="p-6 text-center text-gray-500 font-medium">Amazing! Everyone is accounted for.</td></tr>) : (absenteeList.map((person, idx) => (<tr key={idx} className="hover:bg-red-50 transition-colors"><td className="p-4 font-medium text-gray-900">{person.full_name}</td><td className="p-4 text-gray-600">{person.phone_number || '-'}</td><td className="p-4"><div className="flex items-center gap-3"><button onClick={() => handleSendMessage(person.phone_number, person.full_name, 'whatsapp')} className="text-green-600 hover:bg-green-100 p-2 rounded-full transition-colors" title="Send WhatsApp"><MessageCircle size={20} /></button><button onClick={() => handleSendMessage(person.phone_number, person.full_name, 'sms')} className="text-blue-600 hover:bg-blue-100 p-2 rounded-full transition-colors" title="Send SMS"><MessageSquare size={20} /></button></div></td><td className="p-4"><button onClick={() => {setActiveView('outreach'); setPromptContext(`Draft a warm, caring "we miss you" message to ${person.full_name} who hasn't been to church in a couple of weeks.`);}} className="text-xs bg-white border border-red-300 text-red-600 px-3 py-1 rounded hover:bg-red-600 hover:text-white transition-colors">Custom AI Draft</button></td></tr>)))}</tbody></table></div></div>)}
         {activeView === 'outreach' && isAdmin && (<div className="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-sm border"><button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6"><ArrowLeft size={16} /> Back to Dashboard</button><div className="flex items-center gap-2 mb-4"><Sparkles className="text-orange-500" size={24} /><h2 className="text-2xl font-bold">AI Outreach Drafter</h2></div><div className="space-y-4 max-w-2xl"><textarea rows={4} value={promptContext} onChange={(e) => setPromptContext(e.target.value)} className="w-full border border-gray-300 rounded-md p-3 resize-none focus:ring-2 focus:ring-orange-500" placeholder="Message details..." /><button onClick={handleGenerateMessage} disabled={isGenerating || !promptContext} className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 font-medium">{isGenerating ? 'Drafting...' : 'Generate Message'}</button>{generatedMessage && <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-lg"><h3 className="text-sm font-semibold text-gray-700 mb-2">Drafted Message:</h3><div className="text-gray-800 whitespace-pre-wrap">{generatedMessage}</div></div>}</div></div>)}
         {activeView === 'members' && (<div className="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-sm border"><button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6"><ArrowLeft size={16} /> Back to Dashboard</button><h2 className="text-2xl font-bold mb-4">Registration Form</h2><form onSubmit={handleSaveMember} className="flex flex-col gap-4 max-w-md"><div className="bg-orange-50 p-4 rounded-lg border border-orange-100 mb-2"><label className="block text-sm font-bold text-orange-900 mb-1">Registration Type (Status)</label><select value={memberStatus} onChange={(e) => setMemberStatus(e.target.value)} className="w-full border border-orange-300 rounded-md p-2 bg-white outline-none focus:ring-2 focus:ring-orange-500"><option value="1st Timer">1st Timer</option><option value="2nd Timer">2nd Timer</option><option value="Regular">Regular Member</option></select></div><div><label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label><input type="text" required value={name} onChange={(e) => setName(e.target.value)} className="w-full border border-gray-300 rounded-md p-2" /></div><div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-medium text-gray-700 mb-1">Gender</label><select value={gender} onChange={(e) => setGender(e.target.value)} className="w-full border border-gray-300 rounded-md p-2 bg-white"><option value="">Select...</option><option value="Male">Male</option><option value="Female">Female</option></select></div><div><label className="block text-sm font-medium text-gray-700 mb-1">Birthday</label><input type="text" value={dob} onChange={(e) => setDob(e.target.value)} className="w-full border border-gray-300 rounded-md p-2" /></div></div><div><label className="block text-sm font-medium text-gray-700 mb-1">Occupation</label><input type="text" value={occupation} onChange={(e) => setOccupation(e.target.value)} className="w-full border border-gray-300 rounded-md p-2" /></div><div><label className="block text-sm font-medium text-gray-700 mb-1">Email</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full border border-gray-300 rounded-md p-2" /></div><div><label className="block text-sm font-medium text-gray-700 mb-1">Phone</label><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full border border-gray-300 rounded-md p-2" /></div><button type="submit" disabled={isSubmitting} className="bg-gray-900 text-white px-4 py-3 rounded-md hover:bg-gray-800 font-medium mt-2">{isSubmitting ? 'Saving...' : 'Save Registration'}</button>{statusMessage && <div className={`p-3 rounded-md mt-2 text-sm font-medium ${statusMessage.includes('✅') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{statusMessage}</div>}</form></div>)}
         {activeView === 'attendance' && (<div className="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-sm border"><button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6"><ArrowLeft size={16} /> Back to Dashboard</button><div className="flex items-center gap-2 mb-4"><CheckSquare className="text-orange-500" size={24} /><h2 className="text-2xl font-bold">Service Check-In</h2></div><div className="flex flex-col md:flex-row gap-4 mb-6"><div className="flex-1"><label className="block text-sm font-medium text-gray-700 mb-1">Service Date</label><input type="date" value={checkinDate} onChange={(e) => setCheckinDate(e.target.value)} className="w-full border border-gray-300 rounded-md p-2" /></div><div className="flex-[2]"><label className="block text-sm font-medium text-gray-700 mb-1">Quick Search</label><div className="relative"><div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Search size={16} className="text-gray-400" /></div><input type="text" placeholder="Search by name..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full border border-gray-300 rounded-md py-2 pl-10 pr-3" /></div></div></div><div className="border border-gray-200 rounded-lg overflow-hidden mb-4"><div className="bg-gray-50 p-3 border-b border-gray-200 font-semibold text-gray-700 text-sm flex justify-between"><span>Congregation Roster</span><span className="text-orange-600">{selectedMembers.length} Selected</span></div><div className="max-h-[60vh] overflow-y-auto p-2 bg-white">{memberList.filter(m => m.full_name.toLowerCase().includes(searchTerm.toLowerCase())).map((m, idx) => (<label key={idx} className="flex items-center gap-4 p-4 hover:bg-orange-50 rounded-md cursor-pointer border-b border-gray-100 last:border-0"><input type="checkbox" checked={selectedMembers.includes(m.full_name)} onChange={() => toggleMemberSelection(m.full_name)} className="w-6 h-6 text-orange-500 rounded border-gray-300" /><span className="text-gray-800 font-medium select-none text-lg">{m.full_name}</span></label>))}</div></div><button onClick={handleSaveCheckins} disabled={isSubmitting || memberList.length === 0} className="w-full md:w-auto bg-orange-500 text-white px-8 py-4 rounded-md hover:bg-orange-600 font-bold text-lg disabled:bg-gray-400 shadow-md">{isSubmitting ? 'Saving...' : 'Save Attendance'}</button>{checkinStatusMessage && <div className={`p-4 rounded-md mt-4 text-sm font-medium ${checkinStatusMessage.includes('✅') ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-red-100 text-red-800 border border-red-200'}`}>{checkinStatusMessage}</div>}</div>)}
