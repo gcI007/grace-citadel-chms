@@ -7,14 +7,18 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// --- DESIGN SYSTEM: OFFICIAL LOGO ---
+// --- DESIGN SYSTEM: SIGNATURE CREST ---
 const GraceCrest = ({ className = "w-8 h-8", opacity = 1 }) => (
-  <img 
-    src="/Copy_of_Copy_of_Copy_of_Word_Recap__Instagram_Post__Square____Video___1_-removebg-preview.png" 
-    alt="Grace Citadel Int'l Logo" 
-    className={`object-contain ${className}`} 
-    style={{ opacity }} 
-  />
+  <svg className={className} viewBox="0 0 100 100" style={{ opacity }}>
+    {/* Sacred Geometry: Interlocking Rings */}
+    <circle cx="50" cy="50" r="46" fill="none" stroke="#C8A24D" strokeWidth="1.5" />
+    <circle cx="50" cy="30" r="24" fill="none" stroke="#C8A24D" strokeWidth="0.75" opacity="0.4"/>
+    <circle cx="50" cy="70" r="24" fill="none" stroke="#C8A24D" strokeWidth="0.75" opacity="0.4"/>
+    <circle cx="30" cy="50" r="24" fill="none" stroke="#C8A24D" strokeWidth="0.75" opacity="0.4"/>
+    <circle cx="70" cy="50" r="24" fill="none" stroke="#C8A24D" strokeWidth="0.75" opacity="0.4"/>
+    {/* Central Monogram */}
+    <text x="50" y="58" fontFamily="'Cinzel', serif" fontSize="28" fontWeight="bold" fill="#C8A24D" textAnchor="middle" letterSpacing="2">GC</text>
+  </svg>
 );
 
 // --- MESSAGE TEMPLATES ---
@@ -92,6 +96,7 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [checkinStatusMessage, setCheckinStatusMessage] = useState('');
 
+  // --- 1. THE SECURITY GUARD ---
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setSession(session));
@@ -102,6 +107,7 @@ export default function App() {
   const isUsher = userEmail.includes('usher');
   const isAdmin = !isUsher;
 
+  // --- 2. FETCH DASHBOARD DATA ---
   useEffect(() => {
     if (session && isAdmin) {
         if (activeView === 'dashboard') { fetchBirthdays(); fetchCrmTasks(); }
@@ -117,6 +123,7 @@ export default function App() {
     }
   }, [session, activeView, isAdmin]);
 
+  // --- DATA FETCHING ---
   const fetchBirthdays = async () => {
     const { data } = await supabase.from('members').select('full_name, date_of_birth, phone_number');
     if (data) {
@@ -212,6 +219,7 @@ export default function App() {
       const lastCheckinStr = lastCheckinMap[member.full_name];
       let missedCount = 0; if (lastCheckinStr) missedCount = sortedDates.filter(date => date > lastCheckinStr).length; else missedCount = sortedDates.filter(date => date >= createdDate.toISOString().split('T')[0]).length;
       
+      // Mapped colors to the new disciplined palette
       if (member.status === '1st Timer' && daysSinceCreated >= 1 && daysSinceCreated <= 3) newTasks.push({ priority: 1, type: 'Day 2 Follow-Up', color: 'bg-[#0B1330]/10 text-[#0B1330]', member, description: 'New guest! Send a warm welcome message.', msgTemplate: 'welcome' });
       else if (member.status === '1st Timer' && missedCount >= 1 && daysSinceCreated >= 7) newTasks.push({ priority: 2, type: 'Guest Check-In', color: 'bg-[#C8A24D]/10 text-[#C8A24D]', member, description: 'Did not return for week 2.', msgTemplate: 'missed' });
       
@@ -248,6 +256,7 @@ export default function App() {
     else window.open(`sms:${cleanPhone}?body=${encodeURIComponent(message)}`, '_blank');
   };
 
+  // --- WHATSAPP BULK QUEUE LOGIC ---
   const prepareBulkQueue = async () => {
     setIsSubmitting(true);
     const { data: targets } = await supabase.from('members').select('full_name, phone_number, gender, status, occupation');
@@ -289,6 +298,7 @@ export default function App() {
     setIsSubmitting(false);
   };
 
+  // --- FORM SUBMISSIONS ---
   const handleLogin = async (e: React.FormEvent) => { e.preventDefault(); setIsAuthenticating(true); setAuthError(''); const { error } = await supabase.auth.signInWithPassword({ email: loginEmail, password: loginPassword }); if (error) setAuthError(error.message); setIsAuthenticating(false); };
   const handleLogout = async () => { await supabase.auth.signOut(); setActiveView('dashboard'); };
 
@@ -360,9 +370,13 @@ export default function App() {
   const guestTasks = crmTasks.filter(t => t.member.status === '1st Timer' || t.member.status === '2nd Timer');
   const urgentMissingTasks = crmTasks.filter(t => t.type.includes('RED') || t.type.includes('ORANGE'));
 
+  // ==========================================
+  // UI RENDER: LOGIN SCREEN (ROYAL NAVY DRAMA)
+  // ==========================================
   if (!session) {
     return (
       <div className="min-h-screen bg-[#0B1330] flex items-center justify-center p-4 relative overflow-hidden font-inter">
+        {/* Style injection for Google Fonts */}
         <style dangerouslySetInnerHTML={{__html: `
           @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Cormorant+Garamond:wght@600;700&family=IBM+Plex+Mono:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
           .font-cinzel { font-family: 'Cinzel', serif; }
@@ -373,7 +387,7 @@ export default function App() {
         <GraceCrest className="absolute w-[150vw] h-[150vw] -right-[30vw] -bottom-[30vw] pointer-events-none" opacity={0.03} />
         
         <div className="bg-[#F6F1E4] p-10 rounded-2xl shadow-2xl max-w-md w-full border border-[#C8A24D]/30 relative z-10">
-          <div className="flex justify-center mb-6"><GraceCrest className="w-24 h-24" opacity={1} /></div>
+          <div className="flex justify-center mb-6"><GraceCrest className="w-20 h-20" opacity={1} /></div>
           <h1 className="text-3xl font-cinzel font-bold text-center text-[#0B1330] mb-2 tracking-wide">Grace Citadel</h1>
           <p className="text-center text-[#1C1730]/60 mb-8 font-inter uppercase tracking-widest text-xs font-bold">Command System</p>
           <form onSubmit={handleLogin} className="space-y-5">
@@ -392,8 +406,12 @@ export default function App() {
   const maxMonthlyTotal = monthlyChartData.length > 0 ? Math.max(...monthlyChartData.map(d => d.total)) : 1;
   const maxCellMonthlyTotal = cellStats.trendData.length > 0 ? Math.max(...cellStats.trendData.map(d => d.total)) : 1;
 
+  // ==========================================
+  // UI RENDER: MAIN APP (PARCHMENT, INK, GOLD)
+  // ==========================================
   return (
     <div className="min-h-screen bg-[#EBE7DD] flex flex-col font-inter">
+      {/* Style injection for Google Fonts */}
       <style dangerouslySetInnerHTML={{__html: `
         @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Cormorant+Garamond:wght@600;700&family=IBM+Plex+Mono:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
         .font-cinzel { font-family: 'Cinzel', serif; }
@@ -402,16 +420,19 @@ export default function App() {
         .font-inter { font-family: 'Inter', sans-serif; }
       `}} />
 
+      {/* HEADER: ROYAL NAVY CHROME */}
       <header className="bg-[#0B1330] border-b-2 border-[#C8A24D] px-6 py-4 flex items-center justify-between shadow-md relative z-20">
         <div className="flex items-center gap-4 cursor-pointer group" onClick={() => setActiveView('dashboard')}>
-          <GraceCrest className="w-14 h-14 transform group-hover:scale-105 transition-transform" />
+          <GraceCrest className="w-12 h-12 transform group-hover:scale-105 transition-transform" />
           <div>
             <h1 className="text-2xl font-cinzel font-bold text-[#C8A24D] tracking-wide leading-none">Grace Citadel</h1>
             <p className="text-[10px] text-[#F6F1E4]/70 font-inter uppercase tracking-[0.2em] mt-1 font-bold">Command System</p>
           </div>
         </div>
         <div className="flex items-center gap-4">
-            <span className="text-[#F6F1E4]/70 font-plex text-xs hidden md:inline">{isAdmin ? 'ADMIN CLEARANCE' : 'USHER PORTAL'}</span>
+            <span className="text-[#F6F1E4]/70 font-plex text-xs hidden md:inline">
+                {isAdmin ? 'ADMIN CLEARANCE' : 'USHER PORTAL'}
+            </span>
             <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2 text-sm border border-[#C8A24D]/30 text-[#C8A24D] rounded-md hover:bg-[#2F1B4D] hover:border-[#C8A24D] font-bold transition-colors">
                 <LogOut size={16} /> Exit
             </button>
@@ -421,9 +442,12 @@ export default function App() {
       <main className="flex-1 p-6 relative">
         <GraceCrest className="absolute w-[60vw] h-[60vw] -left-[10vw] top-[10vw] pointer-events-none fixed" opacity={0.03} />
         
+        {/* DASHBOARD GRID */}
         {activeView === 'dashboard' && (
           <div className="max-w-7xl mx-auto space-y-6 relative z-10">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              
+              {/* EVERYONE: PARCHMENT CARDS */}
               <div className="bg-[#F6F1E4] p-6 rounded-xl shadow-sm border border-[#C8A24D]/20 hover:shadow-md hover:border-[#C8A24D]/50 transition-all cursor-pointer group" onClick={() => setActiveView('attendance')}>
                   <h2 className="text-2xl font-cormorant font-bold mb-2 text-[#0B1330] flex items-center gap-3"><CheckSquare size={22} className="text-[#C8A24D]"/> Service Check-In</h2>
                   <p className="text-[#1C1730]/70 text-sm font-inter">Log weekend service attendance roster.</p>
@@ -439,6 +463,7 @@ export default function App() {
 
               {isAdmin && (
                 <>
+                  {/* ADMIN CHROME: NAVY & PURPLE */}
                   <div className="bg-[#2F1B4D] p-6 rounded-xl shadow-lg border border-[#C8A24D]/50 hover:shadow-xl hover:border-[#C8A24D] transition-all cursor-pointer relative overflow-hidden group" onClick={() => setActiveView('tasks')}>
                       <div className="absolute top-0 right-0 bg-[#6E1E2B] text-[#F6F1E4] font-plex text-xs font-bold px-3 py-1 rounded-bl-lg shadow-md">{crmTasks.length} PENDING</div>
                       <h2 className="text-2xl font-cormorant font-bold mb-2 text-[#F6F1E4] flex items-center gap-3"><ShieldCheck size={22} className="text-[#C8A24D]"/> Pastoral Command</h2>
@@ -453,6 +478,7 @@ export default function App() {
                       <p className="text-[#F6F1E4]/70 text-sm font-inter">Execute targeted demographic broadcast queues.</p>
                   </div>
 
+                  {/* ADMIN CARDS: PARCHMENT */}
                   <div className="bg-[#F6F1E4] p-6 rounded-xl shadow-sm border border-[#C8A24D]/20 hover:shadow-md hover:border-[#C8A24D]/50 transition-all cursor-pointer" onClick={() => setActiveView('absentees')}>
                       <h2 className="text-2xl font-cormorant font-bold mb-2 text-[#0B1330] flex items-center gap-3"><UserMinus size={22} className="text-[#6E1E2B]"/> Radar Triage</h2>
                       <p className="text-[#1C1730]/70 text-sm font-inter">Absentee heat-map and alert levels.</p>
@@ -472,9 +498,11 @@ export default function App() {
           </div>
         )}
 
+        {/* --- 🔥 PASTORAL COMMAND CENTER (PURPLE & GOLD CHROME) 🔥 --- */}
         {activeView === 'tasks' && isAdmin && (
             <div className="max-w-6xl mx-auto space-y-6 relative z-10">
                 <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] transition-colors"><ArrowLeft size={16} /> Retreat to Dashboard</button>
+                
                 <div className="bg-[#2F1B4D] p-8 rounded-xl shadow-xl border border-[#C8A24D]/40 text-[#F6F1E4] flex flex-col sm:flex-row items-center justify-between gap-6">
                     <div>
                         <h2 className="text-4xl font-cormorant font-bold flex items-center gap-3 tracking-wide"><ShieldCheck className="text-[#C8A24D]" size={36}/> Pastoral Command</h2>
@@ -490,8 +518,10 @@ export default function App() {
                         </div>
                     </div>
                 </div>
+
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div className="space-y-6">
+                        {/* PARCHMENT CONTENT SURFACES */}
                         <div className="bg-[#F6F1E4] border border-[#C8A24D]/30 rounded-xl p-6 shadow-sm">
                             <h3 className="text-2xl font-cormorant font-bold text-[#0B1330] mb-4 flex items-center gap-2"><Gift size={22} className="text-[#C8A24D]"/> Today's Birthdays</h3>
                             {birthdaysToday.length === 0 ? <p className="text-[#1C1730]/50 text-sm font-inter font-bold italic">No milestones registered today.</p> : birthdaysToday.map((p, i) => (
@@ -535,27 +565,41 @@ export default function App() {
             </div>
         )}
 
+        {/* --- 🔥 OUTREACH NODE (BULK QUEUE) 🔥 --- */}
         {activeView === 'bulk' && isAdmin && (
             <div className="max-w-4xl mx-auto relative z-10">
                 <button onClick={() => { setActiveView('dashboard'); setBulkQueue([]); }} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] mb-6 transition-colors"><ArrowLeft size={16} /> Retreat to Dashboard</button>
+                
                 <div className="bg-[#0B1330] text-[#F6F1E4] p-8 rounded-t-2xl border-b border-[#C8A24D]">
                     <h2 className="text-4xl font-cormorant font-bold flex items-center gap-3"><Share2 className="text-[#C8A24D]"/> Demographic Outreach Node</h2>
                     <p className="text-[#F6F1E4]/60 font-inter text-sm mt-2">Initialize batch communication scripts to specific societal divisions.</p>
                 </div>
+                
                 <div className="bg-[#F6F1E4] p-8 rounded-b-2xl shadow-xl border border-t-0 border-[#C8A24D]/30">
                     {bulkQueue.length > 0 ? (
+                        /* ACTIVE QUEUE UI */
                         <div className="bg-white p-8 rounded-xl border border-[#C8A24D] shadow-inner">
                             <div className="flex justify-between items-start mb-8">
-                                <div><h3 className="text-2xl font-cormorant font-bold text-[#0B1330] flex items-center gap-2"><MessageCircle className="text-[#C8A24D]" /> Dispatch Queue Active</h3><p className="text-sm font-plex text-[#1C1730]/60 mt-1 uppercase tracking-widest">Target: {bulkGroup} Division</p></div>
-                                <div className="bg-[#0B1330] text-[#C8A24D] font-plex font-bold px-4 py-2 rounded shadow">{bulkQueueIndex} / {bulkQueue.length}</div>
+                                <div>
+                                    <h3 className="text-2xl font-cormorant font-bold text-[#0B1330] flex items-center gap-2"><MessageCircle className="text-[#C8A24D]" /> Dispatch Queue Active</h3>
+                                    <p className="text-sm font-plex text-[#1C1730]/60 mt-1 uppercase tracking-widest">Target: {bulkGroup} Division</p>
+                                </div>
+                                <div className="bg-[#0B1330] text-[#C8A24D] font-plex font-bold px-4 py-2 rounded shadow">
+                                    {bulkQueueIndex} / {bulkQueue.length}
+                                </div>
                             </div>
+
                             {bulkQueueIndex < bulkQueue.length ? (
                                 <div className="text-center py-6">
                                     <p className="text-[#1C1730]/50 font-bold font-inter uppercase text-sm mb-2 tracking-widest">Next Target Assigned</p>
                                     <p className="text-4xl font-cormorant font-bold text-[#0B1330] mb-8">{bulkQueue[bulkQueueIndex].name}</p>
                                     <div className="flex flex-col sm:flex-row justify-center gap-4">
-                                        <button onClick={sendNextInQueue} className="bg-[#C8A24D] text-[#0B1330] px-8 py-4 rounded font-bold font-inter hover:bg-[#b59040] shadow-lg transition-colors flex items-center justify-center gap-2 tracking-wide">Execute & Advance &rarr;</button>
-                                        <button onClick={() => setBulkQueue([])} className="bg-transparent text-[#6E1E2B] border-2 border-[#6E1E2B] px-8 py-4 rounded font-bold font-inter hover:bg-[#6E1E2B]/10 transition-colors tracking-wide">Abort Queue</button>
+                                        <button onClick={sendNextInQueue} className="bg-[#C8A24D] text-[#0B1330] px-8 py-4 rounded font-bold font-inter hover:bg-[#b59040] shadow-lg transition-colors flex items-center justify-center gap-2 tracking-wide">
+                                            Execute & Advance &rarr;
+                                        </button>
+                                        <button onClick={() => setBulkQueue([])} className="bg-transparent text-[#6E1E2B] border-2 border-[#6E1E2B] px-8 py-4 rounded font-bold font-inter hover:bg-[#6E1E2B]/10 transition-colors tracking-wide">
+                                            Abort Queue
+                                        </button>
                                     </div>
                                 </div>
                             ) : (
@@ -563,31 +607,43 @@ export default function App() {
                                     <div className="text-5xl mb-4 text-[#C8A24D]">◆</div>
                                     <h3 className="text-3xl font-cormorant font-bold text-[#0B1330] mb-2">Operation Complete</h3>
                                     <p className="text-[#1C1730]/70 font-inter mb-8">All {bulkQueue.length} missives have been delivered.</p>
-                                    <button onClick={() => setBulkQueue([])} className="bg-[#0B1330] text-[#C8A24D] px-8 py-3 rounded font-bold font-inter hover:bg-[#2F1B4D] shadow">Reset Node</button>
+                                    <button onClick={() => setBulkQueue([])} className="bg-[#0B1330] text-[#C8A24D] px-8 py-3 rounded font-bold font-inter hover:bg-[#2F1B4D] shadow">
+                                        Reset Node
+                                    </button>
                                 </div>
                             )}
                         </div>
                     ) : (
+                        /* SETUP UI */
                         <div className="space-y-8 max-w-2xl">
                             <div>
                                 <label className="block text-sm font-bold font-inter text-[#0B1330] mb-3 uppercase tracking-widest">Division Target</label>
                                 <div className="flex gap-4">
                                     {['Student', 'Men', 'Women'].map(group => (
                                         <label key={group} className={`flex items-center justify-center gap-2 border-2 px-6 py-4 rounded cursor-pointer select-none flex-1 transition-all ${bulkGroup === group ? 'border-[#C8A24D] bg-[#0B1330] text-[#C8A24D]' : 'border-[#C8A24D]/30 bg-white text-[#1C1730] hover:border-[#C8A24D]/60'}`}>
-                                            <input type="radio" checked={bulkGroup === group} onChange={() => {setBulkGroup(group); setBulkText(group === 'Student' ? TEMPLATES.bulk_student : TEMPLATES.bulk_men);}} className="hidden" />
+                                            <input type="radio" checked={bulkGroup === group} onChange={() => {
+                                                setBulkGroup(group); 
+                                                setBulkText(group === 'Student' ? TEMPLATES.bulk_student : TEMPLATES.bulk_men);
+                                            }} className="hidden" />
                                             <span className="font-bold font-inter">{group}</span>
                                         </label>
                                     ))}
                                 </div>
                             </div>
+
                             <div>
                                 <label className="block text-sm font-bold font-inter text-[#0B1330] mb-1 uppercase tracking-widest">Script Formulation</label>
                                 <p className="text-xs text-[#1C1730]/60 font-inter mb-3 font-bold">Inject <code className="text-[#C8A24D] bg-[#0B1330] px-1 py-0.5 rounded">{"{name}"}</code> for dynamic target insertion.</p>
                                 <textarea rows={6} value={bulkText} onChange={(e) => setBulkText(e.target.value)} className="w-full bg-white border border-[#C8A24D]/40 rounded-md p-4 font-inter text-[#1C1730] outline-none focus:border-[#C8A24D] focus:ring-1 focus:ring-[#C8A24D] shadow-inner" />
                             </div>
+
                             <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t border-[#C8A24D]/20">
-                                <button onClick={prepareBulkQueue} disabled={isSubmitting} className="flex-1 bg-[#C8A24D] text-[#0B1330] font-bold font-inter tracking-wide py-4 rounded shadow-lg hover:bg-[#b59040] flex items-center justify-center gap-2 transition-colors disabled:opacity-50">{isSubmitting ? 'Processing...' : <><MessageCircle size={22}/> Initialize WA Queue</>}</button>
-                                <button onClick={handleSendBulkSMS} disabled={isSubmitting} className="flex-1 bg-[#0B1330] text-[#C8A24D] font-bold font-inter tracking-wide py-4 rounded shadow-lg hover:bg-[#2F1B4D] flex items-center justify-center gap-2 transition-colors disabled:opacity-50 border border-[#C8A24D]/50"><MessageSquare size={22}/> Execute SMS Batch</button>
+                                <button onClick={prepareBulkQueue} disabled={isSubmitting} className="flex-1 bg-[#C8A24D] text-[#0B1330] font-bold font-inter tracking-wide py-4 rounded shadow-lg hover:bg-[#b59040] flex items-center justify-center gap-2 transition-colors disabled:opacity-50">
+                                    {isSubmitting ? 'Processing...' : <><MessageCircle size={22}/> Initialize WA Queue</>}
+                                </button>
+                                <button onClick={handleSendBulkSMS} disabled={isSubmitting} className="flex-1 bg-[#0B1330] text-[#C8A24D] font-bold font-inter tracking-wide py-4 rounded shadow-lg hover:bg-[#2F1B4D] flex items-center justify-center gap-2 transition-colors disabled:opacity-50 border border-[#C8A24D]/50">
+                                    <MessageSquare size={22}/> Execute SMS Batch
+                                </button>
                             </div>
                         </div>
                     )}
@@ -595,16 +651,23 @@ export default function App() {
             </div>
         )}
 
+        {/* --- 🔥 INTELLIGENCE HUB (ANALYTICS) 🔥 --- */}
         {activeView === 'analytics' && isAdmin && (
           <div className="max-w-6xl mx-auto space-y-6 relative z-10">
             <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] transition-colors"><ArrowLeft size={16} /> Retreat to Dashboard</button>
+            
             <div className="bg-[#0B1330] p-8 rounded-xl shadow-xl border border-[#C8A24D]/40 text-[#F6F1E4] flex flex-col md:flex-row md:items-center justify-between gap-6">
-                <div><h2 className="text-4xl font-cormorant font-bold mb-2 flex items-center gap-3"><TrendingUp size={36} className="text-[#C8A24D]"/> Intelligence Hub</h2><p className="text-[#F6F1E4]/60 font-inter text-sm">Structural growth and metric analysis.</p></div>
+                <div>
+                    <h2 className="text-4xl font-cormorant font-bold mb-2 flex items-center gap-3"><TrendingUp size={36} className="text-[#C8A24D]"/> Intelligence Hub</h2>
+                    <p className="text-[#F6F1E4]/60 font-inter text-sm">Structural growth and metric analysis.</p>
+                </div>
                 <div className="flex bg-[#1C1730] p-1 rounded border border-[#C8A24D]/30 shadow-inner">
                     <button onClick={() => setAnalyticsTab('service')} className={`px-6 py-2 rounded font-bold font-inter text-sm tracking-wide transition-all ${analyticsTab === 'service' ? 'bg-[#C8A24D] text-[#0B1330]' : 'text-[#C8A24D] hover:text-[#F6F1E4]'}`}>Congregation</button>
                     <button onClick={() => setAnalyticsTab('cells')} className={`px-6 py-2 rounded font-bold font-inter text-sm tracking-wide transition-all ${analyticsTab === 'cells' ? 'bg-[#C8A24D] text-[#0B1330]' : 'text-[#C8A24D] hover:text-[#F6F1E4]'}`}>Cell Sectors</button>
                 </div>
             </div>
+
+            {/* TAB: SUNDAY SERVICES */}
             {analyticsTab === 'service' && (
                 <>
                     <div className="bg-[#F6F1E4] p-8 rounded-xl shadow-sm border border-[#C8A24D]/30">
@@ -626,61 +689,210 @@ export default function App() {
                         )}
                     </div>
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div className="bg-[#F6F1E4] rounded-xl shadow-sm border border-[#C8A24D]/30 overflow-hidden"><div className="bg-[#0B1330] p-5 border-b border-[#C8A24D]/40"><h3 className="text-xl font-cormorant font-bold text-[#C8A24D] flex items-center gap-2"><CalendarDays size={20}/> {selectedMonthData ? `Vector: ${selectedMonthData.monthName}` : 'Select a vector above'}</h3></div><div className="p-0">{!selectedMonthData ? (<div className="p-12 text-center text-[#1C1730]/50 font-plex italic">Awaiting selection.</div>) : (<table className="w-full text-left border-collapse"><thead><tr className="bg-white border-b border-[#C8A24D]/20 text-xs font-inter uppercase tracking-widest text-[#1C1730]/60 font-bold"><th className="p-5">Temporal Index</th><th className="p-5">Volume</th></tr></thead><tbody className="divide-y divide-[#C8A24D]/10">{Object.entries(selectedMonthData.services).sort().map(([date, count]: [string, any], idx) => (<tr key={idx} className="hover:bg-[#C8A24D]/5 transition-colors bg-[#F6F1E4]"><td className="p-5 font-bold font-inter text-[#1C1730]">{new Date(date).toLocaleDateString()}</td><td className="p-5 font-plex font-bold text-[#0B1330] text-lg">{count}</td></tr>))}<tr className="bg-[#C8A24D] text-[#0B1330] border-t-2 border-[#0B1330]"><td className="p-5 text-right font-inter font-bold uppercase tracking-widest text-xs">Total Volume</td><td className="p-5 font-plex font-bold text-2xl">{selectedMonthData.total}</td></tr></tbody></table>)}</div></div>
-                        <div className="bg-[#F6F1E4] rounded-xl shadow-sm border border-[#C8A24D]/30 overflow-hidden"><div className="bg-white p-5 border-b-2 border-[#C8A24D]/20"><h3 className="text-xl font-cormorant font-bold text-[#0B1330] flex items-center gap-2"><Users size={20} className="text-[#C8A24D]"/> Vanguard Roster</h3></div><div className="max-h-[400px] overflow-y-auto"><table className="w-full text-left border-collapse"><thead><tr className="bg-white border-b border-[#C8A24D]/20 text-xs font-inter uppercase tracking-widest text-[#1C1730]/60 font-bold sticky top-0 shadow-sm"><th className="p-5">Identity</th><th className="p-5">Cycles</th></tr></thead><tbody className="divide-y divide-[#C8A24D]/10 bg-[#F6F1E4]">{memberStats.length === 0 ? (<tr><td colSpan={2} className="p-8 text-center text-[#1C1730]/50 font-plex italic">No data acquired.</td></tr>) : (memberStats.map((member, idx) => (<tr key={idx} className="hover:bg-[#C8A24D]/5"><td className="p-5 font-bold font-inter text-[#1C1730] flex items-center gap-2">{idx < 3 && <span className="text-[#C8A24D]">◆</span>}{member.name}</td><td className="p-5 font-plex font-bold text-[#0B1330]">{member.count}</td></tr>)))}</tbody></table></div></div>
+                        <div className="bg-[#F6F1E4] rounded-xl shadow-sm border border-[#C8A24D]/30 overflow-hidden">
+                            <div className="bg-[#0B1330] p-5 border-b border-[#C8A24D]/40">
+                                <h3 className="text-xl font-cormorant font-bold text-[#C8A24D] flex items-center gap-2"><CalendarDays size={20}/> {selectedMonthData ? `Vector: ${selectedMonthData.monthName}` : 'Select a vector above'}</h3>
+                            </div>
+                            <div className="p-0">
+                                {!selectedMonthData ? (<div className="p-12 text-center text-[#1C1730]/50 font-plex italic">Awaiting selection.</div>) : (
+                                    <table className="w-full text-left border-collapse">
+                                        <thead><tr className="bg-white border-b border-[#C8A24D]/20 text-xs font-inter uppercase tracking-widest text-[#1C1730]/60 font-bold"><th className="p-5">Temporal Index</th><th className="p-5">Volume</th></tr></thead>
+                                        <tbody className="divide-y divide-[#C8A24D]/10">
+                                            {Object.entries(selectedMonthData.services).sort().map(([date, count]: [string, any], idx) => (
+                                                <tr key={idx} className="hover:bg-[#C8A24D]/5 transition-colors bg-[#F6F1E4]">
+                                                    <td className="p-5 font-bold font-inter text-[#1C1730]">{new Date(date).toLocaleDateString()}</td>
+                                                    <td className="p-5 font-plex font-bold text-[#0B1330] text-lg">{count}</td>
+                                                </tr>
+                                            ))}
+                                            <tr className="bg-[#C8A24D] text-[#0B1330] border-t-2 border-[#0B1330]">
+                                                <td className="p-5 text-right font-inter font-bold uppercase tracking-widest text-xs">Total Volume</td>
+                                                <td className="p-5 font-plex font-bold text-2xl">{selectedMonthData.total}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                )}
+                            </div>
+                        </div>
+                        <div className="bg-[#F6F1E4] rounded-xl shadow-sm border border-[#C8A24D]/30 overflow-hidden">
+                            <div className="bg-white p-5 border-b-2 border-[#C8A24D]/20">
+                                <h3 className="text-xl font-cormorant font-bold text-[#0B1330] flex items-center gap-2"><Users size={20} className="text-[#C8A24D]"/> Vanguard Roster (Consistency)</h3>
+                            </div>
+                            <div className="max-h-[400px] overflow-y-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead><tr className="bg-white border-b border-[#C8A24D]/20 text-xs font-inter uppercase tracking-widest text-[#1C1730]/60 font-bold sticky top-0 shadow-sm"><th className="p-5">Identity</th><th className="p-5">Cycles</th></tr></thead>
+                                    <tbody className="divide-y divide-[#C8A24D]/10 bg-[#F6F1E4]">
+                                        {memberStats.length === 0 ? (<tr><td colSpan={2} className="p-8 text-center text-[#1C1730]/50 font-plex italic">No data acquired.</td></tr>) : (
+                                            memberStats.map((member, idx) => (
+                                                <tr key={idx} className="hover:bg-[#C8A24D]/5">
+                                                    <td className="p-5 font-bold font-inter text-[#1C1730] flex items-center gap-2">{idx < 3 && <span className="text-[#C8A24D]">◆</span>}{member.name}</td>
+                                                    <td className="p-5 font-plex font-bold text-[#0B1330]">{member.count}</td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
                 </>
             )}
+
+            {/* TAB: CELL GROUPS */}
             {analyticsTab === 'cells' && (
                 <>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                        <div className="bg-[#F6F1E4] p-6 rounded-xl border border-[#C8A24D]/30 shadow-sm flex items-center gap-5 border-l-4 border-l-[#0B1330]"><div className="bg-[#0B1330] p-4 rounded text-[#C8A24D]"><Users size={28}/></div><div><p className="text-[10px] text-[#1C1730]/60 font-bold font-inter uppercase tracking-widest">Mean Sector Size</p><p className="text-4xl font-plex font-bold text-[#0B1330]">{cellStats.overallAvg}</p></div></div>
-                        <div className="bg-[#F6F1E4] p-6 rounded-xl border border-[#C8A24D]/30 shadow-sm flex items-center gap-5 border-l-4 border-l-[#C8A24D]"><div className="bg-[#C8A24D] p-4 rounded text-[#0B1330] font-bold text-2xl font-plex">◆</div><div className="overflow-hidden"><p className="text-[10px] text-[#1C1730]/60 font-bold font-inter uppercase tracking-widest">Prime Sector</p><p className="text-xl font-cormorant font-bold text-[#0B1330] truncate">{cellStats.bestCell}</p></div></div>
-                        <div className="bg-[#F6F1E4] p-6 rounded-xl border border-[#C8A24D]/30 shadow-sm flex items-center gap-5 border-l-4 border-l-[#0B1330]"><div className="bg-[#0B1330] p-4 rounded text-[#C8A24D]"><Activity size={28}/></div><div className="overflow-hidden"><p className="text-[10px] text-[#1C1730]/60 font-bold font-inter uppercase tracking-widest">Max Velocity</p><p className="text-xl font-cormorant font-bold text-[#0B1330] truncate">{cellStats.fastestGrowing}</p></div></div>
+                        <div className="bg-[#F6F1E4] p-6 rounded-xl border border-[#C8A24D]/30 shadow-sm flex items-center gap-5 border-l-4 border-l-[#0B1330]">
+                            <div className="bg-[#0B1330] p-4 rounded text-[#C8A24D]"><Users size={28}/></div>
+                            <div><p className="text-[10px] text-[#1C1730]/60 font-bold font-inter uppercase tracking-widest">Mean Sector Size</p><p className="text-4xl font-plex font-bold text-[#0B1330]">{cellStats.overallAvg}</p></div>
+                        </div>
+                        <div className="bg-[#F6F1E4] p-6 rounded-xl border border-[#C8A24D]/30 shadow-sm flex items-center gap-5 border-l-4 border-l-[#C8A24D]">
+                            <div className="bg-[#C8A24D] p-4 rounded text-[#0B1330] font-bold text-2xl font-plex">◆</div>
+                            <div className="overflow-hidden"><p className="text-[10px] text-[#1C1730]/60 font-bold font-inter uppercase tracking-widest">Prime Sector</p><p className="text-xl font-cormorant font-bold text-[#0B1330] truncate">{cellStats.bestCell}</p></div>
+                        </div>
+                        <div className="bg-[#F6F1E4] p-6 rounded-xl border border-[#C8A24D]/30 shadow-sm flex items-center gap-5 border-l-4 border-l-[#0B1330]">
+                            <div className="bg-[#0B1330] p-4 rounded text-[#C8A24D]"><Activity size={28}/></div>
+                            <div className="overflow-hidden"><p className="text-[10px] text-[#1C1730]/60 font-bold font-inter uppercase tracking-widest">Max Velocity</p><p className="text-xl font-cormorant font-bold text-[#0B1330] truncate">{cellStats.fastestGrowing}</p></div>
+                        </div>
                     </div>
-                    <div className="bg-[#F6F1E4] rounded-xl shadow-sm border border-[#C8A24D]/30 overflow-hidden"><div className="bg-[#0B1330] p-5 border-b border-[#C8A24D]/40"><h3 className="text-xl font-cormorant font-bold text-[#C8A24D] flex items-center gap-2"><Home size={20}/> Sector Matrix</h3></div><div className="overflow-x-auto"><table className="w-full text-left border-collapse"><thead><tr className="bg-white border-b border-[#C8A24D]/20 text-xs font-inter uppercase tracking-widest text-[#1C1730]/60 font-bold"><th className="p-5">Sector Designation</th><th className="p-5">Mean Yield</th><th className="p-5">Cycles</th><th className="p-5">Velocity (Growth)</th></tr></thead><tbody className="divide-y divide-[#C8A24D]/10 bg-[#F6F1E4]">{cellStats.cellsArray.length === 0 ? (<tr><td colSpan={4} className="p-8 text-center text-[#1C1730]/50 font-plex italic">No sectors registered.</td></tr>) : (cellStats.cellsArray.map((cell: any, idx: number) => (<tr key={idx} className="hover:bg-[#C8A24D]/5 transition-colors"><td className="p-5 font-bold font-inter text-[#1C1730]">{cell.name}</td><td className="p-5 font-plex font-bold text-[#0B1330] text-lg">{cell.avg}</td><td className="p-5 font-plex text-[#1C1730]/70">{cell.count}</td><td className="p-5 font-plex font-bold">{cell.growth > 0 ? <span className="text-[#0B1330] flex items-center gap-1">+{cell.growth} <TrendingUp size={14} className="text-[#C8A24D]"/></span> : cell.growth < 0 ? <span className="text-[#6E1E2B]">{cell.growth}</span> : <span className="text-[#1C1730]/40">Static</span>}</td></tr>)))}</tbody></table></div></div>
+                    
+                    <div className="bg-[#F6F1E4] rounded-xl shadow-sm border border-[#C8A24D]/30 overflow-hidden">
+                        <div className="bg-[#0B1330] p-5 border-b border-[#C8A24D]/40">
+                            <h3 className="text-xl font-cormorant font-bold text-[#C8A24D] flex items-center gap-2"><Home size={20}/> Sector Matrix</h3>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-white border-b border-[#C8A24D]/20 text-xs font-inter uppercase tracking-widest text-[#1C1730]/60 font-bold">
+                                        <th className="p-5">Sector Designation</th>
+                                        <th className="p-5">Mean Yield</th>
+                                        <th className="p-5">Cycles</th>
+                                        <th className="p-5">Velocity (Growth)</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-[#C8A24D]/10 bg-[#F6F1E4]">
+                                    {cellStats.cellsArray.length === 0 ? (<tr><td colSpan={4} className="p-8 text-center text-[#1C1730]/50 font-plex italic">No sectors registered.</td></tr>) : (
+                                        cellStats.cellsArray.map((cell: any, idx: number) => (
+                                            <tr key={idx} className="hover:bg-[#C8A24D]/5 transition-colors">
+                                                <td className="p-5 font-bold font-inter text-[#1C1730]">{cell.name}</td>
+                                                <td className="p-5 font-plex font-bold text-[#0B1330] text-lg">{cell.avg}</td>
+                                                <td className="p-5 font-plex text-[#1C1730]/70">{cell.count}</td>
+                                                <td className="p-5 font-plex font-bold">
+                                                    {cell.growth > 0 ? <span className="text-[#0B1330] flex items-center gap-1">+{cell.growth} <TrendingUp size={14} className="text-[#C8A24D]"/></span> : 
+                                                     cell.growth < 0 ? <span className="text-[#6E1E2B]">{cell.growth}</span> : 
+                                                     <span className="text-[#1C1730]/40">Static</span>}
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </>
             )}
           </div>
         )}
 
+        {/* --- 🔥 REGISTRATION FORM 🔥 --- */}
         {activeView === 'members' && (
           <div className="max-w-4xl mx-auto bg-[#F6F1E4] p-8 rounded-xl shadow-xl border border-[#C8A24D]/30 relative z-10">
             <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] mb-6 transition-colors"><ArrowLeft size={16} /> Retreat to Dashboard</button>
             <h2 className="text-3xl font-cormorant font-bold text-[#0B1330] mb-8 border-b-2 border-[#C8A24D]/20 pb-4">Entity Registration</h2>
+            
             <form onSubmit={handleSaveMember} className="flex flex-col gap-6 max-w-lg">
-              <div className="bg-white p-5 rounded-lg border border-[#C8A24D]/40 shadow-sm border-l-4 border-l-[#C8A24D]"><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Clearance Profile (Status)</label><select value={memberStatus} onChange={(e) => setMemberStatus(e.target.value)} className="w-full border border-[#C8A24D]/30 rounded p-3 bg-[#F6F1E4] text-[#0B1330] font-bold font-inter outline-none focus:border-[#C8A24D] focus:ring-1 focus:ring-[#C8A24D]"><option value="1st Timer">1st Timer</option><option value="2nd Timer">2nd Timer</option><option value="Student">Student Demographic</option><option value="Regular">Regular Member</option></select></div>
+              <div className="bg-white p-5 rounded-lg border border-[#C8A24D]/40 shadow-sm border-l-4 border-l-[#C8A24D]">
+                <label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Clearance Profile (Status)</label>
+                <select value={memberStatus} onChange={(e) => setMemberStatus(e.target.value)} className="w-full border border-[#C8A24D]/30 rounded p-3 bg-[#F6F1E4] text-[#0B1330] font-bold font-inter outline-none focus:border-[#C8A24D] focus:ring-1 focus:ring-[#C8A24D]">
+                  <option value="1st Timer">1st Timer</option>
+                  <option value="2nd Timer">2nd Timer</option>
+                  <option value="Student">Student Demographic</option>
+                  <option value="Regular">Regular Member</option>
+                </select>
+              </div>
+
               <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Full Identity</label><input type="text" required value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div>
+              
               <div className="grid grid-cols-2 gap-6">
                 <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Gender</label><select value={gender} onChange={(e) => setGender(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]"><option value="">Select...</option><option value="Male">Male</option><option value="Female">Female</option></select></div>
-                <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Guarded Genesis (DOB)</label><div className="flex gap-2"><select value={dobMonth} onChange={(e) => setDobMonth(e.target.value)} className="w-1/2 bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]"><option value="">Mo</option>{['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map(m => <option key={m} value={m}>{m.substring(0,3)}</option>)}</select><select value={dobDay} onChange={(e) => setDobDay(e.target.value)} className="w-1/2 bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]"><option value="">Day</option>{[...Array(31)].map((_, i) => <option key={i+1} value={i+1}>{i+1}</option>)}</select></div></div>
+                <div>
+                  <label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Guarded Genesis (DOB)</label>
+                  <div className="flex gap-2">
+                    <select value={dobMonth} onChange={(e) => setDobMonth(e.target.value)} className="w-1/2 bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]"><option value="">Mo</option>{['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map(m => <option key={m} value={m}>{m.substring(0,3)}</option>)}</select>
+                    <select value={dobDay} onChange={(e) => setDobDay(e.target.value)} className="w-1/2 bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]"><option value="">Day</option>{[...Array(31)].map((_, i) => <option key={i+1} value={i+1}>{i+1}</option>)}</select>
+                  </div>
+                </div>
               </div>
+
               <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Vocation</label><input type="text" value={occupation} onChange={(e) => setOccupation(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div>
               <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Comms Vector (Phone)</label><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-plex outline-none focus:border-[#C8A24D]" /></div>
-              <button type="submit" disabled={isSubmitting} className="bg-[#0B1330] text-[#C8A24D] px-4 py-4 rounded font-bold font-inter uppercase tracking-widest hover:bg-[#2F1B4D] shadow-lg transition-colors border border-[#0B1330] mt-4 disabled:opacity-50">Commit to Ledger</button>
+              
+              <button type="submit" disabled={isSubmitting} className="bg-[#0B1330] text-[#C8A24D] px-4 py-4 rounded font-bold font-inter uppercase tracking-widest hover:bg-[#2F1B4D] shadow-lg transition-colors border border-[#0B1330] mt-4 disabled:opacity-50">
+                Commit to Ledger
+              </button>
+              
               {statusMessage && <div className={`p-4 rounded border font-inter font-bold text-sm ${statusMessage.includes('✅') ? 'bg-[#C8A24D]/10 text-[#0B1330] border-[#C8A24D]' : 'bg-[#6E1E2B]/10 text-[#6E1E2B] border-[#6E1E2B]'}`}>{statusMessage}</div>}
             </form>
           </div>
         )}
 
+        {/* --- 🔥 DYNAMIC MEMBER CHECK-IN 🔥 --- */}
         {activeView === 'attendance' && (
           <div className="max-w-4xl mx-auto bg-[#F6F1E4] p-8 rounded-xl shadow-xl border border-[#C8A24D]/30 relative z-10">
             <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] mb-6 transition-colors"><ArrowLeft size={16} /> Retreat to Dashboard</button>
             <div className="flex items-center gap-3 mb-8 border-b-2 border-[#C8A24D]/20 pb-4"><CheckSquare className="text-[#C8A24D]" size={32} /><h2 className="text-3xl font-cormorant font-bold text-[#0B1330]">Service Registry</h2></div>
-            <div className="flex flex-col md:flex-row gap-6 mb-8"><div className="flex-1"><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Temporal Index (Date)</label><input type="date" value={checkinDate} onChange={(e) => setCheckinDate(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div><div className="flex-[2]"><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Database Query</label><div className="relative"><div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><Search size={18} className="text-[#C8A24D]" /></div><input type="text" placeholder="Query by Identity or Vector (Phone)..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 pl-12 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div></div></div>
-            <div className="border border-[#C8A24D]/40 rounded-lg overflow-hidden mb-6 shadow-sm bg-white"><div className="bg-[#0B1330] p-4 font-bold text-[#F6F1E4] text-sm flex justify-between font-inter uppercase tracking-widest"><span>Congregation Roster</span><span className="text-[#C8A24D] font-plex">{selectedMembers.length} Flagged</span></div><div className="max-h-[50vh] overflow-y-auto p-2 bg-[#F6F1E4]">{memberList.filter(m => m.full_name.toLowerCase().includes(searchTerm.toLowerCase()) || (m.phone_number && m.phone_number.includes(searchTerm))).map((m, idx) => (<label key={m.id || idx} className="flex items-start gap-4 p-4 hover:bg-white rounded cursor-pointer border-b border-[#C8A24D]/10 last:border-0 transition-colors"><input type="checkbox" checked={selectedMembers.includes(m.id)} onChange={() => toggleMemberSelection(m.id)} className="w-6 h-6 mt-0.5 text-[#0B1330] rounded border-[#C8A24D]/40 focus:ring-[#C8A24D]" /><div className="flex flex-col"><span className="text-[#1C1730] font-bold font-inter text-lg">{m.full_name}</span><span className="text-[#1C1730]/50 text-sm font-plex">{m.phone_number || 'No vector on file'}</span></div></label>))}</div></div>
-            <button onClick={handleSaveCheckins} disabled={isSubmitting || memberList.length === 0} className="w-full md:w-auto bg-[#C8A24D] text-[#0B1330] px-10 py-4 rounded font-bold font-inter uppercase tracking-widest text-lg disabled:opacity-50 shadow-lg hover:bg-[#b59040] transition-colors">{isSubmitting ? 'Verifying...' : 'Commit Registry'}</button>
-            {checkinStatusMessage && (<div className={`p-4 rounded mt-6 text-sm font-bold font-inter border ${checkinStatusMessage.includes('✅') ? 'bg-[#C8A24D]/10 text-[#0B1330] border-[#C8A24D]' : checkinStatusMessage.includes('⚠️') ? 'bg-white text-[#0B1330] border-[#0B1330]' : 'bg-[#6E1E2B]/10 text-[#6E1E2B] border-[#6E1E2B]'}`}>{checkinStatusMessage}</div>)}
+            
+            <div className="flex flex-col md:flex-row gap-6 mb-8">
+              <div className="flex-1"><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Temporal Index (Date)</label><input type="date" value={checkinDate} onChange={(e) => setCheckinDate(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div>
+              <div className="flex-[2]">
+                <label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Database Query</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><Search size={18} className="text-[#C8A24D]" /></div>
+                  <input type="text" placeholder="Query by Identity or Vector (Phone)..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 pl-12 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" />
+                </div>
+              </div>
+            </div>
+            
+            <div className="border border-[#C8A24D]/40 rounded-lg overflow-hidden mb-6 shadow-sm bg-white">
+              <div className="bg-[#0B1330] p-4 font-bold text-[#F6F1E4] text-sm flex justify-between font-inter uppercase tracking-widest">
+                  <span>Congregation Roster</span><span className="text-[#C8A24D] font-plex">{selectedMembers.length} Flagged</span>
+              </div>
+              <div className="max-h-[50vh] overflow-y-auto p-2 bg-[#F6F1E4]">
+                {memberList.filter(m => m.full_name.toLowerCase().includes(searchTerm.toLowerCase()) || (m.phone_number && m.phone_number.includes(searchTerm))).map((m, idx) => (
+                  <label key={m.id || idx} className="flex items-start gap-4 p-4 hover:bg-white rounded cursor-pointer border-b border-[#C8A24D]/10 last:border-0 transition-colors">
+                    <input type="checkbox" checked={selectedMembers.includes(m.id)} onChange={() => toggleMemberSelection(m.id)} className="w-6 h-6 mt-0.5 text-[#0B1330] rounded border-[#C8A24D]/40 focus:ring-[#C8A24D]" />
+                    <div className="flex flex-col">
+                        <span className="text-[#1C1730] font-bold font-inter text-lg">{m.full_name}</span>
+                        <span className="text-[#1C1730]/50 text-sm font-plex">{m.phone_number || 'No vector on file'}</span>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+            
+            <button onClick={handleSaveCheckins} disabled={isSubmitting || memberList.length === 0} className="w-full md:w-auto bg-[#C8A24D] text-[#0B1330] px-10 py-4 rounded font-bold font-inter uppercase tracking-widest text-lg disabled:opacity-50 shadow-lg hover:bg-[#b59040] transition-colors">
+                {isSubmitting ? 'Verifying...' : 'Commit Registry'}
+            </button>
+            
+            {checkinStatusMessage && (
+                <div className={`p-4 rounded mt-6 text-sm font-bold font-inter border ${checkinStatusMessage.includes('✅') ? 'bg-[#C8A24D]/10 text-[#0B1330] border-[#C8A24D]' : checkinStatusMessage.includes('⚠️') ? 'bg-white text-[#0B1330] border-[#0B1330]' : 'bg-[#6E1E2B]/10 text-[#6E1E2B] border-[#6E1E2B]'}`}>
+                    {checkinStatusMessage}
+                </div>
+            )}
           </div>
         )}
 
+        {/* --- 🔥 CELL LOG 🔥 --- */}
         {activeView === 'cell_log' && (
           <div className="max-w-4xl mx-auto bg-[#F6F1E4] p-8 rounded-xl shadow-xl border border-[#C8A24D]/30 relative z-10">
             <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] mb-6 transition-colors"><ArrowLeft size={16} /> Retreat to Dashboard</button>
             <div className="flex items-center gap-3 mb-8 border-b-2 border-[#C8A24D]/20 pb-4"><Home className="text-[#C8A24D]" size={32} /><h2 className="text-3xl font-cormorant font-bold text-[#0B1330]">Sector Report (Cells)</h2></div>
+            
             <form onSubmit={handleSaveCellMeeting} className="flex flex-col gap-6 max-w-lg">
               <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Sector Designation</label><input type="text" required value={cellName} onChange={(e) => setCellName(e.target.value)} placeholder="e.g. Grace Fellowship - Downtown" className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div>
-              <div className="grid grid-cols-2 gap-6"><div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Overseer Identity</label><input type="text" required value={cellLeader} onChange={(e) => setCellLeader(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div><div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Total Volume</label><input type="number" required min="1" value={cellAttendance} onChange={(e) => setCellAttendance(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-plex outline-none focus:border-[#C8A24D]" /></div></div>
+              <div className="grid grid-cols-2 gap-6">
+                  <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Overseer Identity</label><input type="text" required value={cellLeader} onChange={(e) => setCellLeader(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div>
+                  <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Total Volume</label><input type="number" required min="1" value={cellAttendance} onChange={(e) => setCellAttendance(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-plex outline-none focus:border-[#C8A24D]" /></div>
+              </div>
               <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Temporal Index</label><input type="date" required value={cellDate} onChange={(e) => setCellDate(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div>
               <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Operational Notes</label><textarea rows={4} value={cellNotes} onChange={(e) => setCellNotes(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div>
               <button type="submit" disabled={isSubmitting} className="bg-[#0B1330] text-[#C8A24D] px-4 py-4 rounded font-bold font-inter uppercase tracking-widest hover:bg-[#2F1B4D] shadow-lg transition-colors border border-[#0B1330] mt-4 disabled:opacity-50">Commit Report</button>
@@ -689,27 +901,83 @@ export default function App() {
           </div>
         )}
 
+        {/* --- 🔥 RADAR TRIAGE (ABSENTEES) 🔥 --- */}
         {activeView === 'absentees' && isAdmin && (
           <div className="max-w-6xl mx-auto space-y-6 relative z-10">
             <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] transition-colors"><ArrowLeft size={16} /> Retreat to Dashboard</button>
-            <div className="bg-[#F6F1E4] rounded-xl shadow-xl border border-[#C8A24D]/30 overflow-hidden"><div className="bg-[#0B1330] p-6 border-b-2 border-[#C8A24D]"><h3 className="text-2xl font-cormorant font-bold text-[#F6F1E4] flex items-center gap-3"><UserMinus className="text-[#6E1E2B]"/> Radar Triage Protocol</h3></div><div className="p-0"><table className="w-full text-left border-collapse"><thead><tr className="bg-white border-b border-[#C8A24D]/20 text-xs font-inter uppercase tracking-widest text-[#1C1730]/60 font-bold"><th className="p-5">Identity</th><th className="p-5">Threat Level</th><th className="p-5">Cycles Missed</th><th className="p-5">Action</th></tr></thead><tbody className="divide-y divide-[#C8A24D]/10 bg-[#F6F1E4]">{absenteeList.map((person, idx) => (<tr key={idx} className="hover:bg-white transition-colors"><td className="p-5 font-bold text-[#1C1730] font-inter text-lg">{person.full_name}</td><td className="p-5"><span className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest border rounded ${person.colorClass}`}>{person.alertLevel}</span></td><td className="p-5 font-plex font-bold text-[#0B1330] text-lg">{person.missedCount}</td><td className="p-5"><button onClick={() => handleSendMessage(person.phone_number, person.full_name, 'whatsapp', 'checking_in')} className="bg-[#0B1330] text-[#C8A24D] px-4 py-2 rounded font-bold font-inter text-xs tracking-wide hover:bg-[#2F1B4D] shadow">DISPATCH</button></td></tr>))}</tbody></table></div></div>
+            <div className="bg-[#F6F1E4] rounded-xl shadow-xl border border-[#C8A24D]/30 overflow-hidden">
+                <div className="bg-[#0B1330] p-6 border-b-2 border-[#C8A24D]">
+                    <h3 className="text-2xl font-cormorant font-bold text-[#F6F1E4] flex items-center gap-3"><UserMinus className="text-[#6E1E2B]"/> Radar Triage Protocol</h3>
+                </div>
+                <div className="p-0">
+                    <table className="w-full text-left border-collapse">
+                        <thead><tr className="bg-white border-b border-[#C8A24D]/20 text-xs font-inter uppercase tracking-widest text-[#1C1730]/60 font-bold"><th className="p-5">Identity</th><th className="p-5">Threat Level</th><th className="p-5">Cycles Missed</th><th className="p-5">Action</th></tr></thead>
+                        <tbody className="divide-y divide-[#C8A24D]/10 bg-[#F6F1E4]">
+                            {absenteeList.map((person, idx) => (
+                                <tr key={idx} className="hover:bg-white transition-colors">
+                                    <td className="p-5 font-bold text-[#1C1730] font-inter text-lg">{person.full_name}</td>
+                                    <td className="p-5"><span className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest border rounded ${person.colorClass}`}>{person.alertLevel}</span></td>
+                                    <td className="p-5 font-plex font-bold text-[#0B1330] text-lg">{person.missedCount}</td>
+                                    <td className="p-5"><button onClick={() => handleSendMessage(person.phone_number, person.full_name, 'whatsapp', 'checking_in')} className="bg-[#0B1330] text-[#C8A24D] px-4 py-2 rounded font-bold font-inter text-xs tracking-wide hover:bg-[#2F1B4D] shadow">DISPATCH</button></td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
           </div>
         )}
 
+        {/* --- 🔥 BIRTHDAY DASHBOARD 🔥 --- */}
         {activeView === 'birthdays' && isAdmin && (
           <div className="max-w-4xl mx-auto space-y-6 relative z-10">
             <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] transition-colors"><ArrowLeft size={16} /> Retreat to Dashboard</button>
-            <div className="bg-[#F6F1E4] rounded-xl shadow-xl border border-[#C8A24D]/30 overflow-hidden"><div className="bg-[#0B1330] p-6 border-b-2 border-[#C8A24D]"><h3 className="text-2xl font-cormorant font-bold text-[#F6F1E4] flex items-center gap-3"><Gift className="text-[#C8A24D]"/> Temporal Milestones (Birthdays)</h3></div><div className="p-4 bg-white/50 border-b border-[#C8A24D]/20"><h4 className="font-bold text-[#1C1730] font-inter tracking-widest uppercase text-xs">Immediate Requirements (Today)</h4></div><div className="bg-[#F6F1E4]">{birthdaysToday.length === 0 ? <div className="p-6 text-center font-plex text-[#1C1730]/50 italic">None logged.</div> : birthdaysToday.map((p, idx) => <BirthdayRow key={idx} person={p} />)}</div><div className="p-4 bg-white/50 border-b border-[#C8A24D]/20 border-t border-[#C8A24D]/40"><h4 className="font-bold text-[#1C1730] font-inter tracking-widest uppercase text-xs">Upcoming Requirements (7 Days)</h4></div><div className="bg-[#F6F1E4]">{birthdaysWeek.length === 0 ? <div className="p-6 text-center font-plex text-[#1C1730]/50 italic">None logged.</div> : birthdaysWeek.map((p, idx) => <BirthdayRow key={idx} person={p} />)}</div></div>
+            <div className="bg-[#F6F1E4] rounded-xl shadow-xl border border-[#C8A24D]/30 overflow-hidden">
+                <div className="bg-[#0B1330] p-6 border-b-2 border-[#C8A24D]">
+                    <h3 className="text-2xl font-cormorant font-bold text-[#F6F1E4] flex items-center gap-3"><Gift className="text-[#C8A24D]"/> Temporal Milestones (Birthdays)</h3>
+                </div>
+                <div className="p-4 bg-white/50 border-b border-[#C8A24D]/20">
+                    <h4 className="font-bold text-[#1C1730] font-inter tracking-widest uppercase text-xs">Immediate Requirements (Today)</h4>
+                </div>
+                <div className="bg-[#F6F1E4]">
+                    {birthdaysToday.length === 0 ? <div className="p-6 text-center font-plex text-[#1C1730]/50 italic">None logged.</div> : birthdaysToday.map((p, idx) => <BirthdayRow key={idx} person={p} />)}
+                </div>
+                
+                <div className="p-4 bg-white/50 border-b border-[#C8A24D]/20 border-t border-[#C8A24D]/40">
+                    <h4 className="font-bold text-[#1C1730] font-inter tracking-widest uppercase text-xs">Upcoming Requirements (7 Days)</h4>
+                </div>
+                <div className="bg-[#F6F1E4]">
+                    {birthdaysWeek.length === 0 ? <div className="p-6 text-center font-plex text-[#1C1730]/50 italic">None logged.</div> : birthdaysWeek.map((p, idx) => <BirthdayRow key={idx} person={p} />)}
+                </div>
+            </div>
           </div>
         )}
 
+        {/* --- 🔥 GUEST ROSTER 🔥 --- */}
         {activeView === 'guests' && isAdmin && (
           <div className="max-w-6xl mx-auto space-y-6 relative z-10">
             <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] transition-colors"><ArrowLeft size={16} /> Retreat to Dashboard</button>
-            <div className="bg-[#F6F1E4] rounded-xl shadow-xl border border-[#C8A24D]/30 overflow-hidden"><div className="bg-[#0B1330] p-6 border-b-2 border-[#C8A24D]"><h3 className="text-2xl font-cormorant font-bold text-[#F6F1E4] flex items-center gap-3"><ClipboardList className="text-[#C8A24D]"/> Primary Acquisitions (Guests)</h3></div><div className="p-0"><table className="w-full text-left border-collapse"><thead><tr className="bg-white border-b border-[#C8A24D]/20 text-xs font-inter uppercase tracking-widest text-[#1C1730]/60 font-bold"><th className="p-5">Identity</th><th className="p-5">Clearance</th><th className="p-5">Vector</th></tr></thead><tbody className="divide-y divide-[#C8A24D]/10 bg-[#F6F1E4]">{guestList.map((g, i) => (<tr key={i} className="hover:bg-white transition-colors"><td className="p-5 font-bold text-[#1C1730] font-inter text-lg">{g.full_name}</td><td className="p-5 font-inter text-sm text-[#0B1330] font-bold">{g.status}</td><td className="p-5 font-plex text-[#1C1730]">{g.phone_number}</td></tr>))}</tbody></table></div></div>
+            <div className="bg-[#F6F1E4] rounded-xl shadow-xl border border-[#C8A24D]/30 overflow-hidden">
+                <div className="bg-[#0B1330] p-6 border-b-2 border-[#C8A24D]">
+                    <h3 className="text-2xl font-cormorant font-bold text-[#F6F1E4] flex items-center gap-3"><ClipboardList className="text-[#C8A24D]"/> Primary Acquisitions (Guests)</h3>
+                </div>
+                <div className="p-0">
+                    <table className="w-full text-left border-collapse">
+                        <thead><tr className="bg-white border-b border-[#C8A24D]/20 text-xs font-inter uppercase tracking-widest text-[#1C1730]/60 font-bold"><th className="p-5">Identity</th><th className="p-5">Clearance</th><th className="p-5">Vector</th></tr></thead>
+                        <tbody className="divide-y divide-[#C8A24D]/10 bg-[#F6F1E4]">
+                            {guestList.map((g, i) => (
+                                <tr key={i} className="hover:bg-white transition-colors">
+                                    <td className="p-5 font-bold text-[#1C1730] font-inter text-lg">{g.full_name}</td>
+                                    <td className="p-5 font-inter text-sm text-[#0B1330] font-bold">{g.status}</td>
+                                    <td className="p-5 font-plex text-[#1C1730]">{g.phone_number}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
           </div>
         )}
-
       </main>
     </div>
   );
