@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, ArrowLeft, Sparkles, Lock, LogOut, Cake, CheckSquare, Search, UserPlus, ClipboardList, UserMinus, BarChart3 } from 'lucide-react';
+import { Users, ArrowLeft, Sparkles, Lock, LogOut, Cake, CheckSquare, Search, UserPlus, ClipboardList, UserMinus, BarChart3, ShieldCheck } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
 // --- INITIALIZE SUPABASE ---
@@ -34,7 +34,7 @@ export default function App() {
   const [guestList, setGuestList] = useState<any[]>([]);
   const [absenteeList, setAbsenteeList] = useState<any[]>([]);
 
-  // --- NEW: ANALYTICS STATE ---
+  // --- ANALYTICS STATE ---
   const [serviceStats, setServiceStats] = useState<any[]>([]);
   const [memberStats, setMemberStats] = useState<any[]>([]);
 
@@ -57,17 +57,23 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // --- SECURITY ROLES ---
+  // If the logged-in email contains "usher", they get restricted access. Otherwise, full admin.
+  const userEmail = session?.user?.email?.toLowerCase() || '';
+  const isUsher = userEmail.includes('usher');
+  const isAdmin = !isUsher;
+
   // --- 2. FETCH DASHBOARD DATA ---
   useEffect(() => {
-    if (session && activeView === 'dashboard') fetchBirthdays();
+    if (session && activeView === 'dashboard' && isAdmin) fetchBirthdays();
     if (session && activeView === 'attendance') {
       fetchMembersForCheckin();
       setSelectedMembers([]); setCheckinStatusMessage(''); setSearchTerm('');
     }
-    if (session && activeView === 'guests') fetchGuests();
-    if (session && activeView === 'absentees') fetchAbsentees();
-    if (session && activeView === 'analytics') fetchAnalytics(); // NEW: Trigger Analytics
-  }, [session, activeView]);
+    if (session && activeView === 'guests' && isAdmin) fetchGuests();
+    if (session && activeView === 'absentees' && isAdmin) fetchAbsentees();
+    if (session && activeView === 'analytics' && isAdmin) fetchAnalytics(); 
+  }, [session, activeView, isAdmin]);
 
   const fetchBirthdays = async () => {
     const { data } = await supabase.from('members').select('full_name, date_of_birth');
@@ -103,32 +109,15 @@ export default function App() {
     }
   };
 
-  // --- NEW: FETCH ANALYTICS ENGINE ---
   const fetchAnalytics = async () => {
-    const { data, error } = await supabase.from('member_checkins').select('*');
+    const { data } = await supabase.from('member_checkins').select('*');
     if (data) {
-      // 1. Calculate Stats per Service Date
-      const dateCounts = data.reduce((acc: any, curr: any) => {
-        acc[curr.service_date] = (acc[curr.service_date] || 0) + 1;
-        return acc;
-      }, {});
-      
-      const formattedDates = Object.keys(dateCounts)
-        .map(date => ({ date, count: dateCounts[date] }))
-        .sort((a, b) => b.date.localeCompare(a.date)); // Sort newest first
-        
+      const dateCounts = data.reduce((acc: any, curr: any) => { acc[curr.service_date] = (acc[curr.service_date] || 0) + 1; return acc; }, {});
+      const formattedDates = Object.keys(dateCounts).map(date => ({ date, count: dateCounts[date] })).sort((a, b) => b.date.localeCompare(a.date));
       setServiceStats(formattedDates);
 
-      // 2. Calculate Consistency per Member
-      const memberCounts = data.reduce((acc: any, curr: any) => {
-        acc[curr.member_name] = (acc[curr.member_name] || 0) + 1;
-        return acc;
-      }, {});
-      
-      const formattedMembers = Object.keys(memberCounts)
-        .map(name => ({ name, count: memberCounts[name] }))
-        .sort((a, b) => b.count - a.count); // Sort highest attendance first
-        
+      const memberCounts = data.reduce((acc: any, curr: any) => { acc[curr.member_name] = (acc[curr.member_name] || 0) + 1; return acc; }, {});
+      const formattedMembers = Object.keys(memberCounts).map(name => ({ name, count: memberCounts[name] })).sort((a, b) => b.count - a.count);
       setMemberStats(formattedMembers);
     }
   };
@@ -141,7 +130,10 @@ export default function App() {
     if (error) setAuthError(error.message);
     setIsAuthenticating(false);
   };
-  const handleLogout = async () => await supabase.auth.signOut();
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setActiveView('dashboard');
+  };
 
   // --- SAVE NEW MEMBER / GUEST ---
   const handleSaveMember = async (e: React.FormEvent) => {
@@ -197,7 +189,7 @@ export default function App() {
           <h1 className="text-2xl font-bold text-center text-gray-900 mb-2">Grace Citadel ChMS</h1>
           <p className="text-center text-gray-500 mb-8">Authorized Personnel Only</p>
           <form onSubmit={handleLogin} className="space-y-4">
-            <div><label className="block text-sm font-medium text-gray-700 mb-1">Admin Email</label><input type="email" required value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} className="w-full border border-gray-300 rounded-md p-3 focus:ring-2 focus:ring-orange-500 outline-none" /></div>
+            <div><label className="block text-sm font-medium text-gray-700 mb-1">Email</label><input type="email" required value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} className="w-full border border-gray-300 rounded-md p-3 focus:ring-2 focus:ring-orange-500 outline-none" /></div>
             <div><label className="block text-sm font-medium text-gray-700 mb-1">Password</label><input type="password" required value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} className="w-full border border-gray-300 rounded-md p-3 focus:ring-2 focus:ring-orange-500 outline-none" /></div>
             {authError && <p className="text-red-600 text-sm font-medium">{authError}</p>}
             <button type="submit" disabled={isAuthenticating} className="w-full bg-gray-900 text-white p-3 rounded-md hover:bg-gray-800 font-medium transition-colors">{isAuthenticating ? 'Authenticating...' : 'Secure Sign In'}</button>
@@ -215,7 +207,12 @@ export default function App() {
       <header className="bg-white shadow-sm border-b px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="bg-orange-500 p-2 rounded-lg text-white cursor-pointer" onClick={() => setActiveView('dashboard')}><Users size={24} /></div>
-          <div><h1 className="text-xl font-bold text-gray-900">Grace Citadel ChMS</h1><p className="text-sm text-gray-500">Relational Database Core & Outreach Node</p></div>
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">Grace Citadel ChMS</h1>
+            <p className="text-sm text-gray-500 flex items-center gap-1">
+              {isAdmin ? <><ShieldCheck size={14} className="text-green-600"/> Administrator Access</> : 'Usher Check-In Portal'}
+            </p>
+          </div>
         </div>
         <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2 text-sm border border-red-200 text-red-600 rounded-md hover:bg-red-50 font-medium"><LogOut size={16} /> Sign Out</button>
       </header>
@@ -225,118 +222,86 @@ export default function App() {
         {/* DASHBOARD */}
         {activeView === 'dashboard' && (
           <div className="max-w-7xl mx-auto space-y-6">
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-4">
-              <div className="bg-blue-500 p-2 rounded-full text-white shrink-0"><Cake size={20} /></div>
-              <div>
-                <h3 className="text-blue-900 font-bold text-lg">This Month's Birthdays</h3>
-                {birthdays.length > 0 ? (
+            
+            {/* ONLY ADMINS SEE BIRTHDAYS */}
+            {isAdmin && birthdays.length > 0 && (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-4">
+                <div className="bg-blue-500 p-2 rounded-full text-white shrink-0"><Cake size={20} /></div>
+                <div>
+                  <h3 className="text-blue-900 font-bold text-lg">This Month's Birthdays</h3>
                   <ul className="mt-2 text-sm text-blue-800 space-y-1">{birthdays.map((b, idx) => <li key={idx}><span className="font-semibold">{b.full_name}</span> - {b.date_of_birth}</li>)}</ul>
-                ) : <p className="text-sm text-blue-700 mt-1">No birthdays logged for the current month yet.</p>}
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              
+              {/* EVERYONE SEES THE CHECK-IN BUTTON */}
               <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
                 <h2 className="text-lg font-semibold mb-2 text-gray-900 flex items-center gap-2"><CheckSquare size={18} className="text-orange-500"/> Check-In</h2>
                 <p className="text-gray-500 text-sm mb-4">Track which members attended service.</p>
                 <button onClick={() => setActiveView('attendance')} className="text-blue-600 font-medium text-sm hover:underline">Log Attendance &rarr;</button>
               </div>
-              <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
-                <h2 className="text-lg font-semibold mb-2 text-gray-900 flex items-center gap-2"><BarChart3 size={18} className="text-orange-500"/> Analytics</h2>
-                <p className="text-gray-500 text-sm mb-4">View total headcounts and member consistency.</p>
-                <button onClick={() => setActiveView('analytics')} className="text-blue-600 font-medium text-sm hover:underline">View Stats &rarr;</button>
-              </div>
-              <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
-                <h2 className="text-lg font-semibold mb-2 text-red-700 flex items-center gap-2"><UserMinus size={18} className="text-red-600"/> Absentee Alert</h2>
-                <p className="text-gray-500 text-sm mb-4">See members missing for 2 weeks or more.</p>
-                <button onClick={() => setActiveView('absentees')} className="text-red-600 font-medium text-sm hover:underline">View Missing &rarr;</button>
-              </div>
-              <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
-                <h2 className="text-lg font-semibold mb-2 text-gray-900 flex items-center gap-2"><UserPlus size={18} className="text-orange-500"/> Registration</h2>
-                <p className="text-gray-500 text-sm mb-4">Register First Timers or add regular members.</p>
-                <button onClick={() => {setActiveView('members'); setStatusMessage('');}} className="text-blue-600 font-medium text-sm hover:underline">Open Form &rarr;</button>
-              </div>
-              <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
-                <h2 className="text-lg font-semibold mb-2 text-gray-900 flex items-center gap-2"><ClipboardList size={18} className="text-orange-500"/> Guest Roster</h2>
-                <p className="text-gray-500 text-sm mb-4">View 1st and 2nd Timer details for follow-up.</p>
-                <button onClick={() => setActiveView('guests')} className="text-blue-600 font-medium text-sm hover:underline">View Guests &rarr;</button>
-              </div>
-              <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
-                <h2 className="text-lg font-semibold mb-2 text-gray-900 flex items-center gap-2"><Sparkles size={18} className="text-orange-500"/> AI Outreach</h2>
-                <p className="text-gray-500 text-sm mb-4">Draft personalized messages using Gemini.</p>
-                <button onClick={() => setActiveView('outreach')} className="text-blue-600 font-medium text-sm hover:underline">Draft Message &rarr;</button>
-              </div>
+
+              {/* ONLY ADMINS SEE THESE BUTTONS */}
+              {isAdmin && (
+                <>
+                  <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
+                    <h2 className="text-lg font-semibold mb-2 text-gray-900 flex items-center gap-2"><BarChart3 size={18} className="text-orange-500"/> Analytics</h2>
+                    <p className="text-gray-500 text-sm mb-4">View total headcounts and member consistency.</p>
+                    <button onClick={() => setActiveView('analytics')} className="text-blue-600 font-medium text-sm hover:underline">View Stats &rarr;</button>
+                  </div>
+                  <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
+                    <h2 className="text-lg font-semibold mb-2 text-red-700 flex items-center gap-2"><UserMinus size={18} className="text-red-600"/> Absentee Alert</h2>
+                    <p className="text-gray-500 text-sm mb-4">See members missing for 2 weeks or more.</p>
+                    <button onClick={() => setActiveView('absentees')} className="text-red-600 font-medium text-sm hover:underline">View Missing &rarr;</button>
+                  </div>
+                  <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
+                    <h2 className="text-lg font-semibold mb-2 text-gray-900 flex items-center gap-2"><UserPlus size={18} className="text-orange-500"/> Registration</h2>
+                    <p className="text-gray-500 text-sm mb-4">Register First Timers or add regular members.</p>
+                    <button onClick={() => {setActiveView('members'); setStatusMessage('');}} className="text-blue-600 font-medium text-sm hover:underline">Open Form &rarr;</button>
+                  </div>
+                  <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
+                    <h2 className="text-lg font-semibold mb-2 text-gray-900 flex items-center gap-2"><ClipboardList size={18} className="text-orange-500"/> Guest Roster</h2>
+                    <p className="text-gray-500 text-sm mb-4">View 1st and 2nd Timer details for follow-up.</p>
+                    <button onClick={() => setActiveView('guests')} className="text-blue-600 font-medium text-sm hover:underline">View Guests &rarr;</button>
+                  </div>
+                  <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
+                    <h2 className="text-lg font-semibold mb-2 text-gray-900 flex items-center gap-2"><Sparkles size={18} className="text-orange-500"/> AI Outreach</h2>
+                    <p className="text-gray-500 text-sm mb-4">Draft personalized messages using Gemini.</p>
+                    <button onClick={() => setActiveView('outreach')} className="text-blue-600 font-medium text-sm hover:underline">Draft Message &rarr;</button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}
 
-        {/* NEW: ANALYTICS & REPORTS */}
-        {activeView === 'analytics' && (
+        {/* ========================================== */}
+        {/* SECURE VIEWS - ADMIN ONLY (Except Check-In)*/}
+        {/* ========================================== */}
+        
+        {/* ANALYTICS & REPORTS */}
+        {activeView === 'analytics' && isAdmin && (
           <div className="max-w-6xl mx-auto bg-white p-6 rounded-xl shadow-sm border">
             <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6"><ArrowLeft size={16} /> Back to Dashboard</button>
             <div className="flex items-center gap-2 mb-6"><BarChart3 className="text-orange-500" size={24} /><h2 className="text-2xl font-bold text-gray-900">Analytics & Reports</h2></div>
-            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {/* Table 1: Stats by Date */}
-              <div>
-                <h3 className="text-lg font-bold text-gray-800 mb-3 bg-gray-50 p-3 rounded-t-lg border border-b-0 border-gray-200">Total Headcount per Service</h3>
-                <div className="overflow-x-auto border border-gray-200 rounded-b-lg">
-                  <table className="w-full text-left border-collapse">
-                    <thead><tr className="bg-gray-100 border-b border-gray-200 text-sm font-semibold text-gray-700"><th className="p-3">Service Date</th><th className="p-3">Total Checked In</th></tr></thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {serviceStats.length === 0 ? (<tr><td colSpan={2} className="p-4 text-center text-gray-500">No services logged yet.</td></tr>) : (
-                        serviceStats.map((stat, idx) => (
-                          <tr key={idx} className="hover:bg-orange-50">
-                            <td className="p-3 font-medium text-gray-900">{new Date(stat.date).toLocaleDateString()}</td>
-                            <td className="p-3 font-bold text-orange-600">{stat.count} members</td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Table 2: Member Consistency */}
-              <div>
-                <h3 className="text-lg font-bold text-gray-800 mb-3 bg-gray-50 p-3 rounded-t-lg border border-b-0 border-gray-200">Member Attendance Frequency</h3>
-                <div className="overflow-x-auto border border-gray-200 rounded-b-lg max-h-[500px] overflow-y-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead><tr className="bg-gray-100 border-b border-gray-200 text-sm font-semibold text-gray-700"><th className="p-3 sticky top-0 bg-gray-100">Member Name</th><th className="p-3 sticky top-0 bg-gray-100">Times Attended</th></tr></thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {memberStats.length === 0 ? (<tr><td colSpan={2} className="p-4 text-center text-gray-500">No attendance data yet.</td></tr>) : (
-                        memberStats.map((member, idx) => (
-                          <tr key={idx} className="hover:bg-blue-50">
-                            <td className="p-3 font-medium text-gray-900">{member.name}</td>
-                            <td className="p-3 font-bold text-blue-600">{member.count}x</td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              <div><h3 className="text-lg font-bold text-gray-800 mb-3 bg-gray-50 p-3 rounded-t-lg border border-b-0 border-gray-200">Total Headcount per Service</h3><div className="overflow-x-auto border border-gray-200 rounded-b-lg"><table className="w-full text-left border-collapse"><thead><tr className="bg-gray-100 border-b border-gray-200 text-sm font-semibold text-gray-700"><th className="p-3">Service Date</th><th className="p-3">Total Checked In</th></tr></thead><tbody className="divide-y divide-gray-200">{serviceStats.length === 0 ? (<tr><td colSpan={2} className="p-4 text-center text-gray-500">No services logged yet.</td></tr>) : (serviceStats.map((stat, idx) => (<tr key={idx} className="hover:bg-orange-50"><td className="p-3 font-medium text-gray-900">{new Date(stat.date).toLocaleDateString()}</td><td className="p-3 font-bold text-orange-600">{stat.count} members</td></tr>)))}</tbody></table></div></div>
+              <div><h3 className="text-lg font-bold text-gray-800 mb-3 bg-gray-50 p-3 rounded-t-lg border border-b-0 border-gray-200">Member Attendance Frequency</h3><div className="overflow-x-auto border border-gray-200 rounded-b-lg max-h-[500px] overflow-y-auto"><table className="w-full text-left border-collapse"><thead><tr className="bg-gray-100 border-b border-gray-200 text-sm font-semibold text-gray-700"><th className="p-3 sticky top-0 bg-gray-100">Member Name</th><th className="p-3 sticky top-0 bg-gray-100">Times Attended</th></tr></thead><tbody className="divide-y divide-gray-200">{memberStats.length === 0 ? (<tr><td colSpan={2} className="p-4 text-center text-gray-500">No attendance data yet.</td></tr>) : (memberStats.map((member, idx) => (<tr key={idx} className="hover:bg-blue-50"><td className="p-3 font-medium text-gray-900">{member.name}</td><td className="p-3 font-bold text-blue-600">{member.count}x</td></tr>)))}</tbody></table></div></div>
             </div>
           </div>
         )}
 
         {/* REGISTRATION FORM */}
-        {activeView === 'members' && (
+        {activeView === 'members' && isAdmin && (
           <div className="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-sm border">
             <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6"><ArrowLeft size={16} /> Back to Dashboard</button>
             <h2 className="text-2xl font-bold mb-4">Registration Form</h2>
             <form onSubmit={handleSaveMember} className="flex flex-col gap-4 max-w-md">
-              <div className="bg-orange-50 p-4 rounded-lg border border-orange-100 mb-2">
-                <label className="block text-sm font-bold text-orange-900 mb-1">Registration Type (Status)</label>
-                <select value={memberStatus} onChange={(e) => setMemberStatus(e.target.value)} className="w-full border border-orange-300 rounded-md p-2 bg-white outline-none focus:ring-2 focus:ring-orange-500">
-                  <option value="1st Timer">1st Timer</option><option value="2nd Timer">2nd Timer</option><option value="Regular">Regular Member</option>
-                </select>
-              </div>
+              <div className="bg-orange-50 p-4 rounded-lg border border-orange-100 mb-2"><label className="block text-sm font-bold text-orange-900 mb-1">Registration Type (Status)</label><select value={memberStatus} onChange={(e) => setMemberStatus(e.target.value)} className="w-full border border-orange-300 rounded-md p-2 bg-white outline-none focus:ring-2 focus:ring-orange-500"><option value="1st Timer">1st Timer</option><option value="2nd Timer">2nd Timer</option><option value="Regular">Regular Member</option></select></div>
               <div><label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label><input type="text" required value={name} onChange={(e) => setName(e.target.value)} className="w-full border border-gray-300 rounded-md p-2" /></div>
-              <div className="grid grid-cols-2 gap-4">
-                <div><label className="block text-sm font-medium text-gray-700 mb-1">Gender</label><select value={gender} onChange={(e) => setGender(e.target.value)} className="w-full border border-gray-300 rounded-md p-2 bg-white"><option value="">Select...</option><option value="Male">Male</option><option value="Female">Female</option></select></div>
-                <div><label className="block text-sm font-medium text-gray-700 mb-1">Birthday</label><input type="text" value={dob} onChange={(e) => setDob(e.target.value)} className="w-full border border-gray-300 rounded-md p-2" /></div>
-              </div>
+              <div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-medium text-gray-700 mb-1">Gender</label><select value={gender} onChange={(e) => setGender(e.target.value)} className="w-full border border-gray-300 rounded-md p-2 bg-white"><option value="">Select...</option><option value="Male">Male</option><option value="Female">Female</option></select></div><div><label className="block text-sm font-medium text-gray-700 mb-1">Birthday</label><input type="text" value={dob} onChange={(e) => setDob(e.target.value)} className="w-full border border-gray-300 rounded-md p-2" /></div></div>
               <div><label className="block text-sm font-medium text-gray-700 mb-1">Occupation</label><input type="text" value={occupation} onChange={(e) => setOccupation(e.target.value)} className="w-full border border-gray-300 rounded-md p-2" /></div>
               <div><label className="block text-sm font-medium text-gray-700 mb-1">Email</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full border border-gray-300 rounded-md p-2" /></div>
               <div><label className="block text-sm font-medium text-gray-700 mb-1">Phone</label><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full border border-gray-300 rounded-md p-2" /></div>
@@ -347,74 +312,37 @@ export default function App() {
         )}
 
         {/* GUEST ROSTER */}
-        {activeView === 'guests' && (
+        {activeView === 'guests' && isAdmin && (
           <div className="max-w-6xl mx-auto bg-white p-6 rounded-xl shadow-sm border">
             <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6"><ArrowLeft size={16} /> Back to Dashboard</button>
             <div className="flex items-center gap-2 mb-4"><ClipboardList className="text-orange-500" size={24} /><h2 className="text-2xl font-bold">Guest Follow-Up Roster</h2></div>
-            <div className="overflow-x-auto border border-gray-200 rounded-lg">
-              <table className="w-full text-left border-collapse">
-                <thead><tr className="bg-gray-50 border-b border-gray-200 text-sm font-semibold text-gray-700"><th className="p-4">Name</th><th className="p-4">Status</th><th className="p-4">Phone</th><th className="p-4">Email</th></tr></thead>
-                <tbody className="divide-y divide-gray-200">
-                  {guestList.length === 0 ? (<tr><td colSpan={4} className="p-6 text-center text-gray-500">No guests found.</td></tr>) : (
-                    guestList.map((guest, idx) => (
-                      <tr key={idx} className="hover:bg-orange-50">
-                        <td className="p-4 font-medium text-gray-900">{guest.full_name}</td>
-                        <td className="p-4"><span className={`px-3 py-1 rounded-full text-xs font-bold ${guest.status === '1st Timer' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}`}>{guest.status}</span></td>
-                        <td className="p-4 text-gray-600">{guest.phone_number || '-'}</td>
-                        <td className="p-4 text-gray-600">{guest.email || '-'}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+            <div className="overflow-x-auto border border-gray-200 rounded-lg"><table className="w-full text-left border-collapse"><thead><tr className="bg-gray-50 border-b border-gray-200 text-sm font-semibold text-gray-700"><th className="p-4">Name</th><th className="p-4">Status</th><th className="p-4">Phone</th><th className="p-4">Email</th></tr></thead><tbody className="divide-y divide-gray-200">{guestList.length === 0 ? (<tr><td colSpan={4} className="p-6 text-center text-gray-500">No guests found.</td></tr>) : (guestList.map((guest, idx) => (<tr key={idx} className="hover:bg-orange-50"><td className="p-4 font-medium text-gray-900">{guest.full_name}</td><td className="p-4"><span className={`px-3 py-1 rounded-full text-xs font-bold ${guest.status === '1st Timer' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}`}>{guest.status}</span></td><td className="p-4 text-gray-600">{guest.phone_number || '-'}</td><td className="p-4 text-gray-600">{guest.email || '-'}</td></tr>)))}</tbody></table></div>
           </div>
         )}
 
         {/* ABSENTEE ALERT ROSTER */}
-        {activeView === 'absentees' && (
+        {activeView === 'absentees' && isAdmin && (
           <div className="max-w-6xl mx-auto bg-white p-6 rounded-xl shadow-sm border">
             <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6"><ArrowLeft size={16} /> Back to Dashboard</button>
             <div className="flex items-center gap-2 mb-4"><UserMinus className="text-red-600" size={24} /><h2 className="text-2xl font-bold text-red-700">Absentee Alert (14+ Days)</h2></div>
             <p className="text-gray-600 mb-6">These members have not checked in to a service within the last 2 weeks.</p>
-            
-            <div className="overflow-x-auto border border-red-200 rounded-lg">
-              <table className="w-full text-left border-collapse">
-                <thead><tr className="bg-red-50 border-b border-red-200 text-sm font-semibold text-red-800"><th className="p-4">Name</th><th className="p-4">Phone Number</th><th className="p-4">Email Address</th><th className="p-4">Action</th></tr></thead>
-                <tbody className="divide-y divide-gray-200">
-                  {absenteeList.length === 0 ? (<tr><td colSpan={4} className="p-6 text-center text-gray-500 font-medium">Amazing! Everyone is accounted for.</td></tr>) : (
-                    absenteeList.map((person, idx) => (
-                      <tr key={idx} className="hover:bg-red-50 transition-colors">
-                        <td className="p-4 font-medium text-gray-900">{person.full_name}</td>
-                        <td className="p-4 text-gray-600">{person.phone_number || '-'}</td>
-                        <td className="p-4 text-gray-600">{person.email || '-'}</td>
-                        <td className="p-4">
-                          <button onClick={() => {setActiveView('outreach'); setPromptContext(`Draft a warm, caring "we miss you" message to ${person.full_name} who hasn't been to church in a couple of weeks.`);}} className="text-xs bg-white border border-red-300 text-red-600 px-3 py-1 rounded hover:bg-red-600 hover:text-white transition-colors">
-                            Draft Message
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+            <div className="overflow-x-auto border border-red-200 rounded-lg"><table className="w-full text-left border-collapse"><thead><tr className="bg-red-50 border-b border-red-200 text-sm font-semibold text-red-800"><th className="p-4">Name</th><th className="p-4">Phone Number</th><th className="p-4">Email Address</th><th className="p-4">Action</th></tr></thead><tbody className="divide-y divide-gray-200">{absenteeList.length === 0 ? (<tr><td colSpan={4} className="p-6 text-center text-gray-500 font-medium">Amazing! Everyone is accounted for.</td></tr>) : (absenteeList.map((person, idx) => (<tr key={idx} className="hover:bg-red-50 transition-colors"><td className="p-4 font-medium text-gray-900">{person.full_name}</td><td className="p-4 text-gray-600">{person.phone_number || '-'}</td><td className="p-4 text-gray-600">{person.email || '-'}</td><td className="p-4"><button onClick={() => {setActiveView('outreach'); setPromptContext(`Draft a warm, caring "we miss you" message to ${person.full_name} who hasn't been to church in a couple of weeks.`);}} className="text-xs bg-white border border-red-300 text-red-600 px-3 py-1 rounded hover:bg-red-600 hover:text-white transition-colors">Draft Message</button></td></tr>)))}</tbody></table></div>
           </div>
         )}
 
         {/* AI OUTREACH */}
-        {activeView === 'outreach' && (
+        {activeView === 'outreach' && isAdmin && (
            <div className="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-sm border">
            <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6"><ArrowLeft size={16} /> Back to Dashboard</button>
            <div className="flex items-center gap-2 mb-4"><Sparkles className="text-orange-500" size={24} /><h2 className="text-2xl font-bold">AI Outreach Drafter</h2></div>
-           <div className="space-y-4 max-w-2xl">
-             <textarea rows={4} value={promptContext} onChange={(e) => setPromptContext(e.target.value)} className="w-full border border-gray-300 rounded-md p-3 resize-none focus:ring-2 focus:ring-orange-500" placeholder="Message details..." />
-             <button onClick={handleGenerateMessage} disabled={isGenerating || !promptContext} className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 font-medium">{isGenerating ? 'Drafting...' : 'Generate Message'}</button>
-             {generatedMessage && <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-lg"><h3 className="text-sm font-semibold text-gray-700 mb-2">Drafted Message:</h3><div className="text-gray-800 whitespace-pre-wrap">{generatedMessage}</div></div>}
-           </div>
+           <div className="space-y-4 max-w-2xl"><textarea rows={4} value={promptContext} onChange={(e) => setPromptContext(e.target.value)} className="w-full border border-gray-300 rounded-md p-3 resize-none focus:ring-2 focus:ring-orange-500" placeholder="Message details..." /><button onClick={handleGenerateMessage} disabled={isGenerating || !promptContext} className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 font-medium">{isGenerating ? 'Drafting...' : 'Generate Message'}</button>{generatedMessage && <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-lg"><h3 className="text-sm font-semibold text-gray-700 mb-2">Drafted Message:</h3><div className="text-gray-800 whitespace-pre-wrap">{generatedMessage}</div></div>}</div>
          </div>
         )}
 
+        {/* ========================================== */}
+        {/* PUBLIC VIEW - EVERYONE SEES THIS */}
+        {/* ========================================== */}
+        
         {/* DYNAMIC MEMBER CHECK-IN */}
         {activeView === 'attendance' && (
           <div className="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-sm border">
@@ -426,13 +354,13 @@ export default function App() {
             </div>
             <div className="border border-gray-200 rounded-lg overflow-hidden mb-4">
               <div className="bg-gray-50 p-3 border-b border-gray-200 font-semibold text-gray-700 text-sm flex justify-between"><span>Congregation Roster</span><span className="text-orange-600">{selectedMembers.length} Selected</span></div>
-              <div className="max-h-80 overflow-y-auto p-2 bg-white">
+              <div className="max-h-[60vh] overflow-y-auto p-2 bg-white">
                 {memberList.filter(m => m.full_name.toLowerCase().includes(searchTerm.toLowerCase())).map((m, idx) => (
-                  <label key={idx} className="flex items-center gap-3 p-3 hover:bg-orange-50 rounded-md cursor-pointer border-b border-gray-100 last:border-0"><input type="checkbox" checked={selectedMembers.includes(m.full_name)} onChange={() => toggleMemberSelection(m.full_name)} className="w-5 h-5 text-orange-500 rounded border-gray-300" /><span className="text-gray-800 font-medium select-none">{m.full_name}</span></label>
+                  <label key={idx} className="flex items-center gap-4 p-4 hover:bg-orange-50 rounded-md cursor-pointer border-b border-gray-100 last:border-0"><input type="checkbox" checked={selectedMembers.includes(m.full_name)} onChange={() => toggleMemberSelection(m.full_name)} className="w-6 h-6 text-orange-500 rounded border-gray-300" /><span className="text-gray-800 font-medium select-none text-lg">{m.full_name}</span></label>
                 ))}
               </div>
             </div>
-            <button onClick={handleSaveCheckins} disabled={isSubmitting || memberList.length === 0} className="w-full md:w-auto bg-orange-500 text-white px-6 py-3 rounded-md hover:bg-orange-600 font-medium disabled:bg-gray-400">{isSubmitting ? 'Saving...' : 'Save Attendance'}</button>
+            <button onClick={handleSaveCheckins} disabled={isSubmitting || memberList.length === 0} className="w-full md:w-auto bg-orange-500 text-white px-8 py-4 rounded-md hover:bg-orange-600 font-bold text-lg disabled:bg-gray-400 shadow-md">{isSubmitting ? 'Saving...' : 'Save Attendance'}</button>
             {checkinStatusMessage && <div className={`p-4 rounded-md mt-4 text-sm font-medium ${checkinStatusMessage.includes('✅') ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-red-100 text-red-800 border border-red-200'}`}>{checkinStatusMessage}</div>}
           </div>
         )}
