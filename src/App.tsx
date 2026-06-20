@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, ArrowLeft, Sparkles, Lock, LogOut, Cake, CheckSquare, Search, UserPlus, ClipboardList, UserMinus, BarChart3, ShieldCheck, MessageCircle, MessageSquare, Heart } from 'lucide-react';
+import { Users, ArrowLeft, Sparkles, Lock, LogOut, Cake, CheckSquare, Search, UserPlus, ClipboardList, UserMinus, BarChart3, ShieldCheck, MessageCircle, MessageSquare, Heart, Gift } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
 // --- INITIALIZE SUPABASE ---
@@ -11,8 +11,8 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 const TEMPLATES = {
   welcome: "Hello {name}, welcome to Grace Citadel! We are so blessed to have you with us. We'd love to see you again this weekend!",
   missed: "Hello {name}, we missed you at service this past Sunday. We hope you are doing well and look forward to seeing you soon!",
-  birthday: "Happy Birthday {name}! Grace Citadel celebrates you today. We pray this year brings you abundant joy and favor!",
-  checking_in: "Hello {name}, just checking in on you from Grace Citadel! We haven't seen you in a little while and wanted to make sure everything is okay. Let us know how we can pray for you."
+  checking_in: "Hello {name}, just checking in on you from Grace Citadel! We haven't seen you in a little while and wanted to make sure everything is okay. Let us know how we can pray for you.",
+  birthday: "Happy Birthday {name}! Grace Citadel celebrates you today. We pray this year brings you abundant joy, health, and favor!"
 };
 
 export default function App() {
@@ -25,15 +25,19 @@ export default function App() {
 
   // --- APP STATE ---
   const [activeView, setActiveView] = useState('dashboard');
-  const [birthdays, setBirthdays] = useState<any[]>([]);
   const [template, setTemplate] = useState('welcome');
+
+  // --- BIRTHDAY STATES ---
+  const [birthdaysToday, setBirthdaysToday] = useState<any[]>([]);
+  const [birthdaysWeek, setBirthdaysWeek] = useState<any[]>([]);
+  const [birthdaysMonth, setBirthdaysMonth] = useState<any[]>([]);
 
   // --- CRM & ROSTER STATES ---
   const [guestList, setGuestList] = useState<any[]>([]);
   const [absenteeList, setAbsenteeList] = useState<any[]>([]);
   const [serviceStats, setServiceStats] = useState<any[]>([]);
   const [memberStats, setMemberStats] = useState<any[]>([]);
-  const [crmTasks, setCrmTasks] = useState<any[]>([]); // NEW: The To-Do List
+  const [crmTasks, setCrmTasks] = useState<any[]>([]);
 
   // --- FORM STATES ---
   const [name, setName] = useState('');
@@ -71,6 +75,7 @@ export default function App() {
   useEffect(() => {
     if (session && isAdmin) {
         if (activeView === 'dashboard') { fetchBirthdays(); fetchCrmTasks(); }
+        if (activeView === 'birthdays') fetchBirthdays();
         if (activeView === 'guests') fetchGuests();
         if (activeView === 'absentees') fetchAbsentees();
         if (activeView === 'analytics') fetchAnalytics(); 
@@ -82,12 +87,51 @@ export default function App() {
     }
   }, [session, activeView, isAdmin]);
 
+  // --- 🔥 NEW: SMART BIRTHDAY ENGINE 🔥 ---
   const fetchBirthdays = async () => {
     const { data } = await supabase.from('members').select('full_name, date_of_birth, phone_number');
     if (data) {
-      const currentMonth = new Date().toLocaleString('default', { month: 'long' });
-      const upcoming = data.filter(m => m.date_of_birth && m.date_of_birth.toLowerCase().includes(currentMonth.toLowerCase()));
-      setBirthdays(upcoming);
+      const today = new Date();
+      const currentMonth = today.getMonth();
+      const currentDate = today.getDate();
+
+      const tList: any[] = [];
+      const wList: any[] = [];
+      const mList: any[] = [];
+
+      data.forEach(m => {
+        if (!m.date_of_birth) return;
+        
+        // Parse the date of birth securely
+        const bDateObj = new Date(m.date_of_birth);
+        if (isNaN(bDateObj.getTime())) return; 
+
+        const bMonth = bDateObj.getMonth();
+        const bDate = bDateObj.getDate();
+
+        // Check if it's today
+        if (bMonth === currentMonth && bDate === currentDate) {
+          tList.push(m);
+        } else {
+          // Calculate days until their birthday THIS year
+          const thisYearsBirthday = new Date(today.getFullYear(), bMonth, bDate);
+          const diffTime = thisYearsBirthday.getTime() - today.getTime();
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+          // If birthday is in the next 7 days
+          if (diffDays > 0 && diffDays <= 7) {
+            wList.push(m);
+          } 
+          // If birthday is later this month (and not today or this week)
+          else if (bMonth === currentMonth && diffDays > 7) {
+            mList.push(m);
+          }
+        }
+      });
+
+      setBirthdaysToday(tList);
+      setBirthdaysWeek(wList);
+      setBirthdaysMonth(mList);
     }
   };
 
@@ -105,64 +149,33 @@ export default function App() {
     }
   };
 
-  // --- 🔥 NEW: SMART CRM TASK GENERATOR 🔥 ---
   const fetchCrmTasks = async () => {
     const { data: members } = await supabase.from('members').select('*');
     const { data: checkins } = await supabase.from('member_checkins').select('*');
     if (!members || !checkins) return;
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    // Get the most recent service date globally
+    const today = new Date(); today.setHours(0, 0, 0, 0);
     const sortedDates = [...new Set(checkins.map(c => c.service_date))].sort();
     const lastGlobalServiceDate = sortedDates[sortedDates.length - 1];
 
-    // Map the last time each member checked in
     const lastCheckinMap: any = {};
-    checkins.forEach(c => {
-      if (!lastCheckinMap[c.member_name] || c.service_date > lastCheckinMap[c.member_name]) {
-        lastCheckinMap[c.member_name] = c.service_date;
-      }
-    });
+    checkins.forEach(c => { if (!lastCheckinMap[c.member_name] || c.service_date > lastCheckinMap[c.member_name]) lastCheckinMap[c.member_name] = c.service_date; });
 
     const newTasks: any[] = [];
 
     members.forEach(member => {
-      const createdDate = new Date(member.created_at || today);
-      createdDate.setHours(0, 0, 0, 0);
+      const createdDate = new Date(member.created_at || today); createdDate.setHours(0, 0, 0, 0);
       const daysSinceCreated = Math.floor((today.getTime() - createdDate.getTime()) / (1000 * 3600 * 24));
-
       const lastCheckinStr = lastCheckinMap[member.full_name];
       let daysSinceLastCheckin = -1;
-      if (lastCheckinStr) {
-        const lastCheckin = new Date(lastCheckinStr);
-        lastCheckin.setHours(0, 0, 0, 0);
-        daysSinceLastCheckin = Math.floor((today.getTime() - lastCheckin.getTime()) / (1000 * 3600 * 24));
-      }
+      if (lastCheckinStr) { const lastCheckin = new Date(lastCheckinStr); lastCheckin.setHours(0, 0, 0, 0); daysSinceLastCheckin = Math.floor((today.getTime() - lastCheckin.getTime()) / (1000 * 3600 * 24)); }
 
-      // RULE 1: Day 2 Follow-Up (1st Timers created 1-3 days ago)
-      if (member.status === '1st Timer' && daysSinceCreated >= 1 && daysSinceCreated <= 3) {
-        newTasks.push({ priority: 1, type: 'Day 2 Follow-Up', color: 'bg-green-100 text-green-800', member, description: 'New guest! Send a warm welcome message.', msgTemplate: 'welcome' });
-      }
-      
-      // RULE 2: Day 8 Missing (1st Timers created 7-10 days ago with NO check-ins since)
-      else if (member.status === '1st Timer' && daysSinceCreated >= 7 && daysSinceCreated <= 10 && (daysSinceLastCheckin === -1 || daysSinceLastCheckin >= 7)) {
-        newTasks.push({ priority: 1, type: 'Day 8 (Not Seen)', color: 'bg-red-100 text-red-800', member, description: 'Did not return for week 2. Reach out!', msgTemplate: 'missed' });
-      }
-      
-      // RULE 3: 14-Day Absentee (Any Status absent for 14-20 days)
-      else if (daysSinceLastCheckin >= 14 && daysSinceLastCheckin <= 20) {
-        newTasks.push({ priority: 2, type: '14 Days Absent', color: 'bg-orange-100 text-orange-800', member, description: 'Has not attended in over 2 weeks.', msgTemplate: 'checking_in' });
-      }
-
-      // RULE 4: Regular Member missed the last logged service
-      else if (member.status === 'Regular' && lastGlobalServiceDate && lastCheckinStr !== lastGlobalServiceDate && daysSinceLastCheckin > 0 && daysSinceLastCheckin < 14) {
-        newTasks.push({ priority: 3, type: 'Missed Last Service', color: 'bg-blue-100 text-blue-800', member, description: 'Was absent this past Sunday.', msgTemplate: 'missed' });
-      }
+      if (member.status === '1st Timer' && daysSinceCreated >= 1 && daysSinceCreated <= 3) newTasks.push({ priority: 1, type: 'Day 2 Follow-Up', color: 'bg-green-100 text-green-800', member, description: 'New guest! Send a warm welcome message.', msgTemplate: 'welcome' });
+      else if (member.status === '1st Timer' && daysSinceCreated >= 7 && daysSinceCreated <= 10 && (daysSinceLastCheckin === -1 || daysSinceLastCheckin >= 7)) newTasks.push({ priority: 1, type: 'Day 8 (Not Seen)', color: 'bg-red-100 text-red-800', member, description: 'Did not return for week 2. Reach out!', msgTemplate: 'missed' });
+      else if (daysSinceLastCheckin >= 14 && daysSinceLastCheckin <= 20) newTasks.push({ priority: 2, type: '14 Days Absent', color: 'bg-orange-100 text-orange-800', member, description: 'Has not attended in over 2 weeks.', msgTemplate: 'checking_in' });
+      else if (member.status === 'Regular' && lastGlobalServiceDate && lastCheckinStr !== lastGlobalServiceDate && daysSinceLastCheckin > 0 && daysSinceLastCheckin < 14) newTasks.push({ priority: 3, type: 'Missed Last Service', color: 'bg-blue-100 text-blue-800', member, description: 'Was absent this past Sunday.', msgTemplate: 'missed' });
     });
 
-    // Sort by priority (High to Low)
     newTasks.sort((a, b) => a.priority - b.priority);
     setCrmTasks(newTasks);
   };
@@ -215,8 +228,23 @@ export default function App() {
     try { await new Promise(resolve => setTimeout(resolve, 2000)); setGeneratedMessage(`[ Simulated AI Response ]\n\nBlessings!\n\nThis is a placeholder message. Once you connect your Google Billing, the real Gemini AI will read your prompt ("${promptContext}") and automatically draft a beautiful, customized message right here!`); } catch (error: any) { setGeneratedMessage('❌ Error: ' + error.message); } finally { setIsGenerating(false); }
   };
 
+  // --- HELPER COMPONENT FOR BIRTHDAY ROWS ---
+  const BirthdayRow = ({ person }: { person: any }) => (
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-100 last:border-0 p-4 hover:bg-gray-50 transition-colors gap-3">
+      <div>
+        <div className="font-bold text-gray-900 text-lg">{person.full_name}</div>
+        <div className="text-gray-500 text-sm">{person.date_of_birth} • {person.phone_number || 'No Phone'}</div>
+      </div>
+      <div className="flex items-center gap-2 flex-wrap">
+        <button onClick={() => handleSendMessage(person.phone_number, person.full_name, 'whatsapp', 'birthday')} className="flex items-center gap-1 bg-green-50 border border-green-200 text-green-700 px-3 py-1.5 rounded hover:bg-green-100 text-sm font-medium transition-colors"><MessageCircle size={16}/> WhatsApp</button>
+        <button onClick={() => handleSendMessage(person.phone_number, person.full_name, 'sms', 'birthday')} className="flex items-center gap-1 bg-blue-50 border border-blue-200 text-blue-700 px-3 py-1.5 rounded hover:bg-blue-100 text-sm font-medium transition-colors"><MessageSquare size={16}/> SMS</button>
+        <button onClick={() => { setActiveView('outreach'); setPromptContext(`Draft a highly personalized, joyous, and prophetic birthday blessing for ${person.full_name} who is a member of Grace Citadel church.`); }} className="flex items-center gap-1 bg-purple-50 border border-purple-200 text-purple-700 px-3 py-1.5 rounded hover:bg-purple-100 text-sm font-medium transition-colors"><Sparkles size={16}/> AI Drafter</button>
+      </div>
+    </div>
+  );
+
   // ==========================================
-  // UI RENDERS
+  // UI RENDER: LOGIN SCREEN
   // ==========================================
   if (!session) {
     return (
@@ -236,6 +264,9 @@ export default function App() {
     );
   }
 
+  // ==========================================
+  // UI RENDER: MAIN APP
+  // ==========================================
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <header className="bg-white shadow-sm border-b px-6 py-4 flex items-center justify-between">
@@ -253,18 +284,12 @@ export default function App() {
 
       <main className="flex-1 p-6">
         
-        {/* DASHBOARD */}
+        {/* DASHBOARD VIEW */}
         {activeView === 'dashboard' && (
           <div className="max-w-7xl mx-auto space-y-6">
-            
-            {isAdmin && birthdays.length > 0 && (
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-4">
-                <div className="bg-blue-500 p-2 rounded-full text-white shrink-0"><Cake size={20} /></div>
-                <div className="w-full"><h3 className="text-blue-900 font-bold text-lg">This Month's Birthdays</h3><ul className="mt-2 text-sm text-blue-800 space-y-3">{birthdays.map((b, idx) => (<li key={idx} className="flex items-center justify-between bg-white/50 p-2 rounded-md"><div><span className="font-semibold">{b.full_name}</span> - {b.date_of_birth}</div><div className="flex gap-2"><button onClick={() => handleSendMessage(b.phone_number, b.full_name, 'whatsapp', 'birthday')} className="p-1 text-green-600 hover:bg-green-100 rounded-full"><MessageCircle size={18}/></button><button onClick={() => handleSendMessage(b.phone_number, b.full_name, 'sms', 'birthday')} className="p-1 text-blue-600 hover:bg-blue-100 rounded-full"><MessageSquare size={18}/></button></div></li>))}</ul></div>
-              </div>
-            )}
-
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              
+              {/* EVERYONE SEES THESE */}
               <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
                 <h2 className="text-lg font-semibold mb-2 text-gray-900 flex items-center gap-2"><CheckSquare size={18} className="text-orange-500"/> Check-In</h2>
                 <p className="text-gray-500 text-sm mb-4">Track which members attended service.</p>
@@ -277,20 +302,27 @@ export default function App() {
                 <button onClick={() => {setActiveView('members'); setStatusMessage('');}} className="text-blue-600 font-medium text-sm hover:underline">Open Form &rarr;</button>
               </div>
 
-              {/* CRM DASHBOARD CARD */}
-              {isAdmin && (
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-orange-200 hover:shadow-md transition-shadow relative overflow-hidden">
-                    <div className="absolute top-0 right-0 bg-orange-500 text-white text-xs font-bold px-3 py-1 rounded-bl-lg">
-                        {crmTasks.length} Action{crmTasks.length !== 1 ? 's' : ''} Needed
-                    </div>
-                    <h2 className="text-lg font-semibold mb-2 text-orange-700 flex items-center gap-2"><Heart size={18} className="text-orange-600"/> Pastoral Care CRM</h2>
-                    <p className="text-gray-500 text-sm mb-4">Automated follow-up tasks for guests and missed members.</p>
-                    <button onClick={() => setActiveView('tasks')} className="text-orange-600 font-bold text-sm hover:underline">Open Workflow &rarr;</button>
-                </div>
-              )}
-
+              {/* ADMIN ONLY CARDS */}
               {isAdmin && (
                 <>
+                  {/* NEW BIRTHDAY DASHBOARD CARD */}
+                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl shadow-sm border border-blue-200 hover:shadow-md transition-shadow relative overflow-hidden">
+                      {birthdaysToday.length > 0 && <div className="absolute top-0 right-0 bg-blue-500 text-white text-xs font-bold px-3 py-1 rounded-bl-lg">Today!</div>}
+                      <h2 className="text-lg font-semibold mb-2 text-blue-800 flex items-center gap-2"><Gift size={18} className="text-blue-600"/> Birthday Dashboard</h2>
+                      <p className="text-blue-600 text-sm mb-4">
+                        {birthdaysToday.length} today • {birthdaysWeek.length} this week
+                      </p>
+                      <button onClick={() => setActiveView('birthdays')} className="text-blue-700 font-bold text-sm hover:underline">Manage Birthdays &rarr;</button>
+                  </div>
+
+                  {/* CRM DASHBOARD CARD */}
+                  <div className="bg-white p-6 rounded-xl shadow-sm border border-orange-200 hover:shadow-md transition-shadow relative overflow-hidden">
+                      {crmTasks.length > 0 && <div className="absolute top-0 right-0 bg-orange-500 text-white text-xs font-bold px-3 py-1 rounded-bl-lg">{crmTasks.length} Action{crmTasks.length !== 1 ? 's' : ''} Needed</div>}
+                      <h2 className="text-lg font-semibold mb-2 text-orange-700 flex items-center gap-2"><Heart size={18} className="text-orange-600"/> Pastoral Care CRM</h2>
+                      <p className="text-gray-500 text-sm mb-4">Automated follow-up tasks for guests and missed members.</p>
+                      <button onClick={() => setActiveView('tasks')} className="text-orange-600 font-bold text-sm hover:underline">Open Workflow &rarr;</button>
+                  </div>
+
                   <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow"><h2 className="text-lg font-semibold mb-2 text-gray-900 flex items-center gap-2"><BarChart3 size={18} className="text-orange-500"/> Analytics</h2><p className="text-gray-500 text-sm mb-4">View total headcounts and member consistency.</p><button onClick={() => setActiveView('analytics')} className="text-blue-600 font-medium text-sm hover:underline">View Stats &rarr;</button></div>
                   <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow"><h2 className="text-lg font-semibold mb-2 text-red-700 flex items-center gap-2"><UserMinus size={18} className="text-red-600"/> Absentee Alert</h2><p className="text-gray-500 text-sm mb-4">See members missing for 2 weeks or more.</p><button onClick={() => setActiveView('absentees')} className="text-red-600 font-medium text-sm hover:underline">View Missing &rarr;</button></div>
                   <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow"><h2 className="text-lg font-semibold mb-2 text-gray-900 flex items-center gap-2"><ClipboardList size={18} className="text-orange-500"/> Guest Roster</h2><p className="text-gray-500 text-sm mb-4">View 1st and 2nd Timer details for follow-up.</p><button onClick={() => setActiveView('guests')} className="text-blue-600 font-medium text-sm hover:underline">View Guests &rarr;</button></div>
@@ -301,7 +333,63 @@ export default function App() {
           </div>
         )}
 
-        {/* --- NEW: CRM TASK WORKFLOW VIEW --- */}
+        {/* --- 🔥 NEW: BIRTHDAY DASHBOARD VIEW 🔥 --- */}
+        {activeView === 'birthdays' && isAdmin && (
+            <div className="max-w-4xl mx-auto space-y-6">
+                <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800"><ArrowLeft size={16} /> Back to Dashboard</button>
+                
+                <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-8 rounded-xl shadow-md text-white flex items-center justify-between">
+                    <div>
+                        <h2 className="text-3xl font-bold mb-2 flex items-center gap-3"><Cake size={32} /> Birthday Management</h2>
+                        <p className="text-blue-100">Send blessings, celebrate milestones, and manage upcoming birthdays.</p>
+                    </div>
+                </div>
+
+                {/* TODAY'S BIRTHDAYS */}
+                <div className="bg-white rounded-xl shadow-sm border border-blue-200 overflow-hidden">
+                    <div className="bg-blue-50 border-b border-blue-200 p-4 font-bold text-blue-900 flex items-center gap-2 text-lg">
+                        <span>🎂</span> Today's Birthdays
+                    </div>
+                    <div>
+                        {birthdaysToday.length === 0 ? (
+                            <div className="p-6 text-center text-gray-500">No birthdays today.</div>
+                        ) : (
+                            birthdaysToday.map((person, idx) => <BirthdayRow key={idx} person={person} />)
+                        )}
+                    </div>
+                </div>
+
+                {/* THIS WEEK'S BIRTHDAYS */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div className="bg-gray-50 border-b border-gray-200 p-4 font-bold text-gray-800 flex items-center gap-2 text-lg">
+                        <span>🎉</span> This Week's Birthdays (Next 7 Days)
+                    </div>
+                    <div>
+                        {birthdaysWeek.length === 0 ? (
+                            <div className="p-6 text-center text-gray-500">No upcoming birthdays this week.</div>
+                        ) : (
+                            birthdaysWeek.map((person, idx) => <BirthdayRow key={idx} person={person} />)
+                        )}
+                    </div>
+                </div>
+
+                {/* THIS MONTH'S BIRTHDAYS */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div className="bg-gray-50 border-b border-gray-200 p-4 font-bold text-gray-800 flex items-center gap-2 text-lg">
+                        <span>🗓️</span> Later This Month
+                    </div>
+                    <div>
+                        {birthdaysMonth.length === 0 ? (
+                            <div className="p-6 text-center text-gray-500">No other birthdays later this month.</div>
+                        ) : (
+                            birthdaysMonth.map((person, idx) => <BirthdayRow key={idx} person={person} />)
+                        )}
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* --- CRM TASK WORKFLOW VIEW --- */}
         {activeView === 'tasks' && isAdmin && (
             <div className="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-sm border">
                 <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6"><ArrowLeft size={16} /> Back to Dashboard</button>
@@ -309,9 +397,7 @@ export default function App() {
                     <div className="flex items-center gap-2"><Heart className="text-orange-500" size={28} /><h2 className="text-2xl font-bold text-gray-900">Follow-Up Workflow</h2></div>
                     <span className="bg-orange-100 text-orange-800 px-4 py-1 rounded-full text-sm font-bold">{crmTasks.length} Pending Tasks</span>
                 </div>
-                
                 <p className="text-gray-600 mb-6">These tasks are automatically generated based on member registration and attendance patterns. Click the message icons to instantly send the appropriate template.</p>
-                
                 <div className="space-y-4">
                     {crmTasks.length === 0 ? (
                         <div className="text-center p-8 bg-gray-50 rounded-lg text-gray-500">Amazing! Your follow-up queue is completely empty.</div>
@@ -319,10 +405,7 @@ export default function App() {
                         crmTasks.map((task, idx) => (
                             <div key={idx} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">
                                 <div>
-                                    <div className="flex items-center gap-3 mb-1">
-                                        <h3 className="font-bold text-gray-900 text-lg">{task.member.full_name}</h3>
-                                        <span className={`text-xs font-bold px-2 py-1 rounded ${task.color}`}>{task.type}</span>
-                                    </div>
+                                    <div className="flex items-center gap-3 mb-1"><h3 className="font-bold text-gray-900 text-lg">{task.member.full_name}</h3><span className={`text-xs font-bold px-2 py-1 rounded ${task.color}`}>{task.type}</span></div>
                                     <p className="text-gray-600 text-sm">{task.description}</p>
                                     <p className="text-gray-400 text-xs mt-1">Phone: {task.member.phone_number || 'N/A'}</p>
                                 </div>
@@ -337,7 +420,7 @@ export default function App() {
             </div>
         )}
 
-        {/* ... [ALL PREVIOUS VIEWS REMAIN UNCHANGED BELOW] ... */}
+        {/* ... [ALL PREVIOUS VIEWS - ANALYTICS, GUESTS, ABSENTEES, OUTREACH, REGISTRATION, CHECK-IN] ... */}
         {/* TEMPLATE SELECTOR FOR OUTREACH LISTS */}
         {(activeView === 'guests' || activeView === 'absentees') && (
             <div className="max-w-6xl mx-auto mb-4 bg-white p-4 rounded-xl shadow-sm border flex flex-col sm:flex-row items-start sm:items-center gap-4">
