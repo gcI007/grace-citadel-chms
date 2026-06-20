@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, ArrowLeft, Sparkles, Lock, LogOut, Cake, CheckSquare, Search, UserPlus, ClipboardList, UserMinus, BarChart3, ShieldCheck, MessageCircle, MessageSquare, Heart, Gift } from 'lucide-react';
+import { Users, ArrowLeft, Sparkles, Lock, LogOut, Cake, CheckSquare, Search, UserPlus, ClipboardList, UserMinus, BarChart3, ShieldCheck, MessageCircle, MessageSquare, Heart, Gift, TrendingUp, CalendarDays } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
 // --- INITIALIZE SUPABASE ---
@@ -35,9 +35,12 @@ export default function App() {
   // --- CRM & ROSTER STATES ---
   const [guestList, setGuestList] = useState<any[]>([]);
   const [absenteeList, setAbsenteeList] = useState<any[]>([]);
-  const [serviceStats, setServiceStats] = useState<any[]>([]);
-  const [memberStats, setMemberStats] = useState<any[]>([]);
   const [crmTasks, setCrmTasks] = useState<any[]>([]);
+
+  // --- NEW: VISUAL ANALYTICS STATES ---
+  const [monthlyChartData, setMonthlyChartData] = useState<any[]>([]);
+  const [selectedMonthData, setSelectedMonthData] = useState<any | null>(null);
+  const [memberStats, setMemberStats] = useState<any[]>([]);
 
   // --- FORM STATES ---
   const [name, setName] = useState('');
@@ -78,7 +81,7 @@ export default function App() {
         if (activeView === 'birthdays') fetchBirthdays();
         if (activeView === 'guests') fetchGuests();
         if (activeView === 'absentees') fetchAbsentees();
-        if (activeView === 'analytics') fetchAnalytics(); 
+        if (activeView === 'analytics') { fetchAnalytics(); setSelectedMonthData(null); }
         if (activeView === 'tasks') fetchCrmTasks();
     }
     if (session && activeView === 'attendance') {
@@ -87,57 +90,70 @@ export default function App() {
     }
   }, [session, activeView, isAdmin]);
 
-  // --- 🔥 NEW: SMART BIRTHDAY ENGINE 🔥 ---
+  // --- FETCHING LOGIC ---
   const fetchBirthdays = async () => {
     const { data } = await supabase.from('members').select('full_name, date_of_birth, phone_number');
     if (data) {
       const today = new Date();
       const currentMonth = today.getMonth();
       const currentDate = today.getDate();
-
-      const tList: any[] = [];
-      const wList: any[] = [];
-      const mList: any[] = [];
+      const tList: any[] = []; const wList: any[] = []; const mList: any[] = [];
 
       data.forEach(m => {
         if (!m.date_of_birth) return;
-        
-        // Parse the date of birth securely
         const bDateObj = new Date(m.date_of_birth);
         if (isNaN(bDateObj.getTime())) return; 
-
         const bMonth = bDateObj.getMonth();
         const bDate = bDateObj.getDate();
 
-        // Check if it's today
-        if (bMonth === currentMonth && bDate === currentDate) {
-          tList.push(m);
-        } else {
-          // Calculate days until their birthday THIS year
+        if (bMonth === currentMonth && bDate === currentDate) tList.push(m);
+        else {
           const thisYearsBirthday = new Date(today.getFullYear(), bMonth, bDate);
-          const diffTime = thisYearsBirthday.getTime() - today.getTime();
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-          // If birthday is in the next 7 days
-          if (diffDays > 0 && diffDays <= 7) {
-            wList.push(m);
-          } 
-          // If birthday is later this month (and not today or this week)
-          else if (bMonth === currentMonth && diffDays > 7) {
-            mList.push(m);
-          }
+          const diffDays = Math.ceil((thisYearsBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+          if (diffDays > 0 && diffDays <= 7) wList.push(m);
+          else if (bMonth === currentMonth && diffDays > 7) mList.push(m);
         }
       });
-
-      setBirthdaysToday(tList);
-      setBirthdaysWeek(wList);
-      setBirthdaysMonth(mList);
+      setBirthdaysToday(tList); setBirthdaysWeek(wList); setBirthdaysMonth(mList);
     }
   };
 
   const fetchMembersForCheckin = async () => { const { data } = await supabase.from('members').select('full_name').order('full_name'); if (data) setMemberList(data); };
   const fetchGuests = async () => { const { data } = await supabase.from('members').select('*').in('status', ['1st Timer', '2nd Timer']).order('created_at', { ascending: false }); if (data) setGuestList(data); };
-  const fetchAnalytics = async () => { const { data } = await supabase.from('member_checkins').select('*'); if (data) { const dateCounts = data.reduce((acc: any, curr: any) => { acc[curr.service_date] = (acc[curr.service_date] || 0) + 1; return acc; }, {}); setServiceStats(Object.keys(dateCounts).map(date => ({ date, count: dateCounts[date] })).sort((a, b) => b.date.localeCompare(a.date))); const memberCounts = data.reduce((acc: any, curr: any) => { acc[curr.member_name] = (acc[curr.member_name] || 0) + 1; return acc; }, {}); setMemberStats(Object.keys(memberCounts).map(name => ({ name, count: memberCounts[name] })).sort((a, b) => b.count - a.count)); } };
+  
+  // --- 🔥 NEW: VISUAL ANALYTICS ENGINE 🔥 ---
+  const fetchAnalytics = async () => { 
+    const { data } = await supabase.from('member_checkins').select('*'); 
+    if (data) { 
+      // 1. Group By Month & Build Drill-Down Data
+      const monthMap: any = {};
+      
+      data.forEach(checkin => {
+        const dateObj = new Date(checkin.service_date);
+        // Format as "January 2026"
+        const monthKey = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+        
+        if (!monthMap[monthKey]) {
+            monthMap[monthKey] = { monthName: monthKey, total: 0, sortDate: dateObj.getTime(), services: {} };
+        }
+        
+        monthMap[monthKey].total += 1;
+        
+        if (!monthMap[monthKey].services[checkin.service_date]) {
+            monthMap[monthKey].services[checkin.service_date] = 0;
+        }
+        monthMap[monthKey].services[checkin.service_date] += 1;
+      });
+
+      // Convert to array and sort chronologically (oldest to newest for the chart)
+      const formattedMonths = Object.values(monthMap).sort((a: any, b: any) => a.sortDate - b.sortDate);
+      setMonthlyChartData(formattedMonths);
+
+      // 2. Member Consistency Leaderboard
+      const memberCounts = data.reduce((acc: any, curr: any) => { acc[curr.member_name] = (acc[curr.member_name] || 0) + 1; return acc; }, {}); 
+      setMemberStats(Object.keys(memberCounts).map(name => ({ name, count: memberCounts[name] })).sort((a, b) => b.count - a.count)); 
+    } 
+  };
   
   const fetchAbsentees = async () => {
     const cutoffDate = new Date(new Date().setDate(new Date().getDate() - 14)).toISOString().split('T')[0];
@@ -157,12 +173,10 @@ export default function App() {
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const sortedDates = [...new Set(checkins.map(c => c.service_date))].sort();
     const lastGlobalServiceDate = sortedDates[sortedDates.length - 1];
-
     const lastCheckinMap: any = {};
     checkins.forEach(c => { if (!lastCheckinMap[c.member_name] || c.service_date > lastCheckinMap[c.member_name]) lastCheckinMap[c.member_name] = c.service_date; });
 
     const newTasks: any[] = [];
-
     members.forEach(member => {
       const createdDate = new Date(member.created_at || today); createdDate.setHours(0, 0, 0, 0);
       const daysSinceCreated = Math.floor((today.getTime() - createdDate.getTime()) / (1000 * 3600 * 24));
@@ -176,8 +190,7 @@ export default function App() {
       else if (member.status === 'Regular' && lastGlobalServiceDate && lastCheckinStr !== lastGlobalServiceDate && daysSinceLastCheckin > 0 && daysSinceLastCheckin < 14) newTasks.push({ priority: 3, type: 'Missed Last Service', color: 'bg-blue-100 text-blue-800', member, description: 'Was absent this past Sunday.', msgTemplate: 'missed' });
     });
 
-    newTasks.sort((a, b) => a.priority - b.priority);
-    setCrmTasks(newTasks);
+    newTasks.sort((a, b) => a.priority - b.priority); setCrmTasks(newTasks);
   };
 
   const handleSendMessage = (phone: string | null, name: string, type: 'whatsapp' | 'sms', overrideTemplate?: string) => {
@@ -228,18 +241,10 @@ export default function App() {
     try { await new Promise(resolve => setTimeout(resolve, 2000)); setGeneratedMessage(`[ Simulated AI Response ]\n\nBlessings!\n\nThis is a placeholder message. Once you connect your Google Billing, the real Gemini AI will read your prompt ("${promptContext}") and automatically draft a beautiful, customized message right here!`); } catch (error: any) { setGeneratedMessage('❌ Error: ' + error.message); } finally { setIsGenerating(false); }
   };
 
-  // --- HELPER COMPONENT FOR BIRTHDAY ROWS ---
   const BirthdayRow = ({ person }: { person: any }) => (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-100 last:border-0 p-4 hover:bg-gray-50 transition-colors gap-3">
-      <div>
-        <div className="font-bold text-gray-900 text-lg">{person.full_name}</div>
-        <div className="text-gray-500 text-sm">{person.date_of_birth} • {person.phone_number || 'No Phone'}</div>
-      </div>
-      <div className="flex items-center gap-2 flex-wrap">
-        <button onClick={() => handleSendMessage(person.phone_number, person.full_name, 'whatsapp', 'birthday')} className="flex items-center gap-1 bg-green-50 border border-green-200 text-green-700 px-3 py-1.5 rounded hover:bg-green-100 text-sm font-medium transition-colors"><MessageCircle size={16}/> WhatsApp</button>
-        <button onClick={() => handleSendMessage(person.phone_number, person.full_name, 'sms', 'birthday')} className="flex items-center gap-1 bg-blue-50 border border-blue-200 text-blue-700 px-3 py-1.5 rounded hover:bg-blue-100 text-sm font-medium transition-colors"><MessageSquare size={16}/> SMS</button>
-        <button onClick={() => { setActiveView('outreach'); setPromptContext(`Draft a highly personalized, joyous, and prophetic birthday blessing for ${person.full_name} who is a member of Grace Citadel church.`); }} className="flex items-center gap-1 bg-purple-50 border border-purple-200 text-purple-700 px-3 py-1.5 rounded hover:bg-purple-100 text-sm font-medium transition-colors"><Sparkles size={16}/> AI Drafter</button>
-      </div>
+      <div><div className="font-bold text-gray-900 text-lg">{person.full_name}</div><div className="text-gray-500 text-sm">{person.date_of_birth} • {person.phone_number || 'No Phone'}</div></div>
+      <div className="flex items-center gap-2 flex-wrap"><button onClick={() => handleSendMessage(person.phone_number, person.full_name, 'whatsapp', 'birthday')} className="flex items-center gap-1 bg-green-50 border border-green-200 text-green-700 px-3 py-1.5 rounded hover:bg-green-100 text-sm font-medium transition-colors"><MessageCircle size={16}/> WhatsApp</button><button onClick={() => handleSendMessage(person.phone_number, person.full_name, 'sms', 'birthday')} className="flex items-center gap-1 bg-blue-50 border border-blue-200 text-blue-700 px-3 py-1.5 rounded hover:bg-blue-100 text-sm font-medium transition-colors"><MessageSquare size={16}/> SMS</button><button onClick={() => { setActiveView('outreach'); setPromptContext(`Draft a highly personalized, joyous, and prophetic birthday blessing for ${person.full_name} who is a member of Grace Citadel church.`); }} className="flex items-center gap-1 bg-purple-50 border border-purple-200 text-purple-700 px-3 py-1.5 rounded hover:bg-purple-100 text-sm font-medium transition-colors"><Sparkles size={16}/> AI Drafter</button></div>
     </div>
   );
 
@@ -263,6 +268,9 @@ export default function App() {
       </div>
     );
   }
+
+  // --- Calculate Chart Maximums ---
+  const maxMonthlyTotal = monthlyChartData.length > 0 ? Math.max(...monthlyChartData.map(d => d.total)) : 1;
 
   // ==========================================
   // UI RENDER: MAIN APP
@@ -305,17 +313,19 @@ export default function App() {
               {/* ADMIN ONLY CARDS */}
               {isAdmin && (
                 <>
-                  {/* NEW BIRTHDAY DASHBOARD CARD */}
+                  <div className="bg-gradient-to-br from-indigo-50 to-purple-50 p-6 rounded-xl shadow-sm border border-indigo-200 hover:shadow-md transition-shadow">
+                      <h2 className="text-lg font-semibold mb-2 text-indigo-800 flex items-center gap-2"><TrendingUp size={18} className="text-indigo-600"/> Service Analytics</h2>
+                      <p className="text-indigo-600 text-sm mb-4">Visual charts of weekly, monthly, and yearly church growth.</p>
+                      <button onClick={() => setActiveView('analytics')} className="text-indigo-700 font-bold text-sm hover:underline">Open Dashboard 📊 &rarr;</button>
+                  </div>
+
                   <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl shadow-sm border border-blue-200 hover:shadow-md transition-shadow relative overflow-hidden">
                       {birthdaysToday.length > 0 && <div className="absolute top-0 right-0 bg-blue-500 text-white text-xs font-bold px-3 py-1 rounded-bl-lg">Today!</div>}
                       <h2 className="text-lg font-semibold mb-2 text-blue-800 flex items-center gap-2"><Gift size={18} className="text-blue-600"/> Birthday Dashboard</h2>
-                      <p className="text-blue-600 text-sm mb-4">
-                        {birthdaysToday.length} today • {birthdaysWeek.length} this week
-                      </p>
+                      <p className="text-blue-600 text-sm mb-4">{birthdaysToday.length} today • {birthdaysWeek.length} this week</p>
                       <button onClick={() => setActiveView('birthdays')} className="text-blue-700 font-bold text-sm hover:underline">Manage Birthdays &rarr;</button>
                   </div>
 
-                  {/* CRM DASHBOARD CARD */}
                   <div className="bg-white p-6 rounded-xl shadow-sm border border-orange-200 hover:shadow-md transition-shadow relative overflow-hidden">
                       {crmTasks.length > 0 && <div className="absolute top-0 right-0 bg-orange-500 text-white text-xs font-bold px-3 py-1 rounded-bl-lg">{crmTasks.length} Action{crmTasks.length !== 1 ? 's' : ''} Needed</div>}
                       <h2 className="text-lg font-semibold mb-2 text-orange-700 flex items-center gap-2"><Heart size={18} className="text-orange-600"/> Pastoral Care CRM</h2>
@@ -323,7 +333,6 @@ export default function App() {
                       <button onClick={() => setActiveView('tasks')} className="text-orange-600 font-bold text-sm hover:underline">Open Workflow &rarr;</button>
                   </div>
 
-                  <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow"><h2 className="text-lg font-semibold mb-2 text-gray-900 flex items-center gap-2"><BarChart3 size={18} className="text-orange-500"/> Analytics</h2><p className="text-gray-500 text-sm mb-4">View total headcounts and member consistency.</p><button onClick={() => setActiveView('analytics')} className="text-blue-600 font-medium text-sm hover:underline">View Stats &rarr;</button></div>
                   <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow"><h2 className="text-lg font-semibold mb-2 text-red-700 flex items-center gap-2"><UserMinus size={18} className="text-red-600"/> Absentee Alert</h2><p className="text-gray-500 text-sm mb-4">See members missing for 2 weeks or more.</p><button onClick={() => setActiveView('absentees')} className="text-red-600 font-medium text-sm hover:underline">View Missing &rarr;</button></div>
                   <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow"><h2 className="text-lg font-semibold mb-2 text-gray-900 flex items-center gap-2"><ClipboardList size={18} className="text-orange-500"/> Guest Roster</h2><p className="text-gray-500 text-sm mb-4">View 1st and 2nd Timer details for follow-up.</p><button onClick={() => setActiveView('guests')} className="text-blue-600 font-medium text-sm hover:underline">View Guests &rarr;</button></div>
                   <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow"><h2 className="text-lg font-semibold mb-2 text-gray-900 flex items-center gap-2"><Sparkles size={18} className="text-orange-500"/> AI Outreach</h2><p className="text-gray-500 text-sm mb-4">Draft personalized messages using Gemini.</p><button onClick={() => setActiveView('outreach')} className="text-blue-600 font-medium text-sm hover:underline">Draft Message &rarr;</button></div>
@@ -333,108 +342,124 @@ export default function App() {
           </div>
         )}
 
-        {/* --- 🔥 NEW: BIRTHDAY DASHBOARD VIEW 🔥 --- */}
-        {activeView === 'birthdays' && isAdmin && (
-            <div className="max-w-4xl mx-auto space-y-6">
-                <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800"><ArrowLeft size={16} /> Back to Dashboard</button>
+        {/* --- 🔥 NEW: VISUAL ANALYTICS DASHBOARD 🔥 --- */}
+        {activeView === 'analytics' && isAdmin && (
+          <div className="max-w-6xl mx-auto space-y-6">
+            <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800"><ArrowLeft size={16} /> Back to Dashboard</button>
+            
+            <div className="bg-gradient-to-r from-indigo-700 to-purple-800 p-8 rounded-xl shadow-md text-white flex items-center justify-between mb-8">
+                <div>
+                    <h2 className="text-3xl font-bold mb-2 flex items-center gap-3"><TrendingUp size={32} /> Service Analytics Dashboard</h2>
+                    <p className="text-indigo-200">Track monthly trends, measure service attendance, and identify church growth patterns.</p>
+                </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                <h3 className="text-xl font-bold text-gray-800 mb-6 border-b pb-4 flex items-center gap-2"><BarChart3 className="text-indigo-600"/> Monthly Growth Trend</h3>
                 
-                <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-8 rounded-xl shadow-md text-white flex items-center justify-between">
-                    <div>
-                        <h2 className="text-3xl font-bold mb-2 flex items-center gap-3"><Cake size={32} /> Birthday Management</h2>
-                        <p className="text-blue-100">Send blessings, celebrate milestones, and manage upcoming birthdays.</p>
-                    </div>
-                </div>
-
-                {/* TODAY'S BIRTHDAYS */}
-                <div className="bg-white rounded-xl shadow-sm border border-blue-200 overflow-hidden">
-                    <div className="bg-blue-50 border-b border-blue-200 p-4 font-bold text-blue-900 flex items-center gap-2 text-lg">
-                        <span>🎂</span> Today's Birthdays
-                    </div>
-                    <div>
-                        {birthdaysToday.length === 0 ? (
-                            <div className="p-6 text-center text-gray-500">No birthdays today.</div>
-                        ) : (
-                            birthdaysToday.map((person, idx) => <BirthdayRow key={idx} person={person} />)
-                        )}
-                    </div>
-                </div>
-
-                {/* THIS WEEK'S BIRTHDAYS */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                    <div className="bg-gray-50 border-b border-gray-200 p-4 font-bold text-gray-800 flex items-center gap-2 text-lg">
-                        <span>🎉</span> This Week's Birthdays (Next 7 Days)
-                    </div>
-                    <div>
-                        {birthdaysWeek.length === 0 ? (
-                            <div className="p-6 text-center text-gray-500">No upcoming birthdays this week.</div>
-                        ) : (
-                            birthdaysWeek.map((person, idx) => <BirthdayRow key={idx} person={person} />)
-                        )}
-                    </div>
-                </div>
-
-                {/* THIS MONTH'S BIRTHDAYS */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                    <div className="bg-gray-50 border-b border-gray-200 p-4 font-bold text-gray-800 flex items-center gap-2 text-lg">
-                        <span>🗓️</span> Later This Month
-                    </div>
-                    <div>
-                        {birthdaysMonth.length === 0 ? (
-                            <div className="p-6 text-center text-gray-500">No other birthdays later this month.</div>
-                        ) : (
-                            birthdaysMonth.map((person, idx) => <BirthdayRow key={idx} person={person} />)
-                        )}
-                    </div>
-                </div>
-            </div>
-        )}
-
-        {/* --- CRM TASK WORKFLOW VIEW --- */}
-        {activeView === 'tasks' && isAdmin && (
-            <div className="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-sm border">
-                <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6"><ArrowLeft size={16} /> Back to Dashboard</button>
-                <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-2"><Heart className="text-orange-500" size={28} /><h2 className="text-2xl font-bold text-gray-900">Follow-Up Workflow</h2></div>
-                    <span className="bg-orange-100 text-orange-800 px-4 py-1 rounded-full text-sm font-bold">{crmTasks.length} Pending Tasks</span>
-                </div>
-                <p className="text-gray-600 mb-6">These tasks are automatically generated based on member registration and attendance patterns. Click the message icons to instantly send the appropriate template.</p>
-                <div className="space-y-4">
-                    {crmTasks.length === 0 ? (
-                        <div className="text-center p-8 bg-gray-50 rounded-lg text-gray-500">Amazing! Your follow-up queue is completely empty.</div>
-                    ) : (
-                        crmTasks.map((task, idx) => (
-                            <div key={idx} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                <div>
-                                    <div className="flex items-center gap-3 mb-1"><h3 className="font-bold text-gray-900 text-lg">{task.member.full_name}</h3><span className={`text-xs font-bold px-2 py-1 rounded ${task.color}`}>{task.type}</span></div>
-                                    <p className="text-gray-600 text-sm">{task.description}</p>
-                                    <p className="text-gray-400 text-xs mt-1">Phone: {task.member.phone_number || 'N/A'}</p>
+                {/* THE VISUAL CSS BAR CHART */}
+                {monthlyChartData.length === 0 ? (
+                    <div className="text-center p-12 text-gray-500 bg-gray-50 rounded-lg">No attendance data recorded yet.</div>
+                ) : (
+                    <div className="flex items-end gap-2 md:gap-6 h-64 mt-8 pb-4 border-b-2 border-gray-100 overflow-x-auto">
+                        {monthlyChartData.map((data, idx) => {
+                            const barHeight = Math.max((data.total / maxMonthlyTotal) * 100, 5); // min 5% height
+                            const isSelected = selectedMonthData?.monthName === data.monthName;
+                            
+                            return (
+                                <div key={idx} onClick={() => setSelectedMonthData(data)} className="flex flex-col items-center flex-1 min-w-[60px] group cursor-pointer">
+                                    {/* Tooltip / Label above bar */}
+                                    <span className={`text-xs font-bold mb-2 transition-colors ${isSelected ? 'text-indigo-700 scale-110' : 'text-gray-400 group-hover:text-indigo-500'}`}>
+                                        {data.total}
+                                    </span>
+                                    {/* The Dynamic Bar */}
+                                    <div 
+                                        style={{ height: `${barHeight}%` }} 
+                                        className={`w-full rounded-t-md transition-all duration-300 ${isSelected ? 'bg-indigo-600 shadow-lg' : 'bg-indigo-200 group-hover:bg-indigo-400'}`}
+                                    ></div>
+                                    {/* Month Label */}
+                                    <span className={`text-xs mt-3 whitespace-nowrap font-medium ${isSelected ? 'text-indigo-900' : 'text-gray-500'}`}>
+                                        {data.monthName.split(' ')[0]} {/* e.g. January */}
+                                    </span>
                                 </div>
-                                <div className="flex items-center gap-3 shrink-0">
-                                    <button onClick={() => handleSendMessage(task.member.phone_number, task.member.full_name, 'whatsapp', task.msgTemplate)} className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 px-4 py-2 rounded-md hover:bg-green-100 font-medium transition-colors"><MessageCircle size={18}/> WhatsApp</button>
-                                    <button onClick={() => handleSendMessage(task.member.phone_number, task.member.full_name, 'sms', task.msgTemplate)} className="flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 px-4 py-2 rounded-md hover:bg-blue-100 font-medium transition-colors"><MessageSquare size={18}/> SMS</button>
-                                </div>
-                            </div>
-                        ))
-                    )}
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* DRILL-DOWN: INDIVIDUAL SERVICES FOR SELECTED MONTH */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div className="bg-indigo-50 p-4 border-b border-indigo-100">
+                        <h3 className="text-lg font-bold text-indigo-900 flex items-center gap-2">
+                            <CalendarDays size={20} className="text-indigo-600"/> 
+                            {selectedMonthData ? `Service Breakdown: ${selectedMonthData.monthName}` : 'Select a month to see breakdown'}
+                        </h3>
+                    </div>
+                    
+                    <div className="p-0">
+                        {!selectedMonthData ? (
+                            <div className="p-12 text-center text-gray-500">Click a bar on the chart above to view individual service numbers for that month.</div>
+                        ) : (
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-gray-50 border-b text-sm text-gray-600">
+                                        <th className="p-4 font-semibold">Service Date</th>
+                                        <th className="p-4 font-semibold">Total Attendance</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {Object.entries(selectedMonthData.services).sort().map(([date, count]: [string, any], idx) => (
+                                        <tr key={idx} className="hover:bg-indigo-50 transition-colors">
+                                            <td className="p-4 font-medium text-gray-900">{new Date(date).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</td>
+                                            <td className="p-4 font-bold text-indigo-700">{count} members</td>
+                                        </tr>
+                                    ))}
+                                    <tr className="bg-indigo-600 text-white font-bold">
+                                        <td className="p-4 text-right uppercase text-xs tracking-wider">Monthly Total</td>
+                                        <td className="p-4 text-xl">{selectedMonthData.total}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
+                </div>
+
+                {/* CONSISTENCY LEADERBOARD */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div className="bg-gray-50 p-4 border-b border-gray-200">
+                        <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2"><Users size={20} className="text-orange-500"/> Consistency Leaderboard</h3>
+                    </div>
+                    <div className="max-h-[400px] overflow-y-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead><tr className="bg-white border-b text-sm text-gray-600 sticky top-0 shadow-sm"><th className="p-4 font-semibold">Member Name</th><th className="p-4 font-semibold">Total Services Attended</th></tr></thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {memberStats.length === 0 ? (<tr><td colSpan={2} className="p-4 text-center text-gray-500">No attendance data yet.</td></tr>) : (
+                                    memberStats.map((member, idx) => (
+                                        <tr key={idx} className="hover:bg-orange-50">
+                                            <td className="p-4 font-medium text-gray-900 flex items-center gap-2">
+                                                {idx < 3 && <span className="text-lg" title={`Top ${idx+1}`}>🏆</span>}
+                                                {member.name}
+                                            </td>
+                                            <td className="p-4 font-bold text-orange-600">{member.count}x</td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
+          </div>
         )}
 
-        {/* ... [ALL PREVIOUS VIEWS - ANALYTICS, GUESTS, ABSENTEES, OUTREACH, REGISTRATION, CHECK-IN] ... */}
-        {/* TEMPLATE SELECTOR FOR OUTREACH LISTS */}
-        {(activeView === 'guests' || activeView === 'absentees') && (
-            <div className="max-w-6xl mx-auto mb-4 bg-white p-4 rounded-xl shadow-sm border flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                <label className="font-semibold text-gray-800">Quick Message Template:</label>
-                <select value={template} onChange={(e) => setTemplate(e.target.value)} className="border border-gray-300 rounded-md p-2 flex-1 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500">
-                    <option value="welcome">👋 Welcome Guest Message</option>
-                    <option value="missed">❤️ We Missed You Message</option>
-                    <option value="checking_in">👀 Checking In (Absentee)</option>
-                    <option value="birthday">🎂 Birthday Blessing</option>
-                </select>
-            </div>
-        )}
-
-        {activeView === 'analytics' && isAdmin && (<div className="max-w-6xl mx-auto bg-white p-6 rounded-xl shadow-sm border"><button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6"><ArrowLeft size={16} /> Back to Dashboard</button><div className="flex items-center gap-2 mb-6"><BarChart3 className="text-orange-500" size={24} /><h2 className="text-2xl font-bold text-gray-900">Analytics & Reports</h2></div><div className="grid grid-cols-1 md:grid-cols-2 gap-8"><div><h3 className="text-lg font-bold text-gray-800 mb-3 bg-gray-50 p-3 rounded-t-lg border border-b-0 border-gray-200">Total Headcount per Service</h3><div className="overflow-x-auto border border-gray-200 rounded-b-lg"><table className="w-full text-left border-collapse"><thead><tr className="bg-gray-100 border-b border-gray-200 text-sm font-semibold text-gray-700"><th className="p-3">Service Date</th><th className="p-3">Total Checked In</th></tr></thead><tbody className="divide-y divide-gray-200">{serviceStats.length === 0 ? (<tr><td colSpan={2} className="p-4 text-center text-gray-500">No services logged yet.</td></tr>) : (serviceStats.map((stat, idx) => (<tr key={idx} className="hover:bg-orange-50"><td className="p-3 font-medium text-gray-900">{new Date(stat.date).toLocaleDateString()}</td><td className="p-3 font-bold text-orange-600">{stat.count} members</td></tr>)))}</tbody></table></div></div><div><h3 className="text-lg font-bold text-gray-800 mb-3 bg-gray-50 p-3 rounded-t-lg border border-b-0 border-gray-200">Member Attendance Frequency</h3><div className="overflow-x-auto border border-gray-200 rounded-b-lg max-h-[500px] overflow-y-auto"><table className="w-full text-left border-collapse"><thead><tr className="bg-gray-100 border-b border-gray-200 text-sm font-semibold text-gray-700"><th className="p-3 sticky top-0 bg-gray-100">Member Name</th><th className="p-3 sticky top-0 bg-gray-100">Times Attended</th></tr></thead><tbody className="divide-y divide-gray-200">{memberStats.length === 0 ? (<tr><td colSpan={2} className="p-4 text-center text-gray-500">No attendance data yet.</td></tr>) : (memberStats.map((member, idx) => (<tr key={idx} className="hover:bg-blue-50"><td className="p-3 font-medium text-gray-900">{member.name}</td><td className="p-3 font-bold text-blue-600">{member.count}x</td></tr>)))}</tbody></table></div></div></div></div>)}
+        {/* ... [ALL OTHER EXISTING VIEWS - BIRTHDAYS, TASKS, GUESTS, ABSENTEES, OUTREACH, REGISTRATION, CHECK-IN] ... */}
+        {/* TEMPLATE SELECTOR */}
+        {(activeView === 'guests' || activeView === 'absentees') && (<div className="max-w-6xl mx-auto mb-4 bg-white p-4 rounded-xl shadow-sm border flex flex-col sm:flex-row items-start sm:items-center gap-4"><label className="font-semibold text-gray-800">Quick Message Template:</label><select value={template} onChange={(e) => setTemplate(e.target.value)} className="border border-gray-300 rounded-md p-2 flex-1 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500"><option value="welcome">👋 Welcome Guest Message</option><option value="missed">❤️ We Missed You Message</option><option value="checking_in">👀 Checking In (Absentee)</option><option value="birthday">🎂 Birthday Blessing</option></select></div>)}
+        
+        {activeView === 'birthdays' && isAdmin && (<div className="max-w-4xl mx-auto space-y-6"><button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800"><ArrowLeft size={16} /> Back to Dashboard</button><div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-8 rounded-xl shadow-md text-white flex items-center justify-between"><div><h2 className="text-3xl font-bold mb-2 flex items-center gap-3"><Cake size={32} /> Birthday Management</h2><p className="text-blue-100">Send blessings, celebrate milestones, and manage upcoming birthdays.</p></div></div><div className="bg-white rounded-xl shadow-sm border border-blue-200 overflow-hidden"><div className="bg-blue-50 border-b border-blue-200 p-4 font-bold text-blue-900 flex items-center gap-2 text-lg"><span>🎂</span> Today's Birthdays</div><div>{birthdaysToday.length === 0 ? (<div className="p-6 text-center text-gray-500">No birthdays today.</div>) : (birthdaysToday.map((person, idx) => <BirthdayRow key={idx} person={person} />))}</div></div><div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"><div className="bg-gray-50 border-b border-gray-200 p-4 font-bold text-gray-800 flex items-center gap-2 text-lg"><span>🎉</span> This Week's Birthdays (Next 7 Days)</div><div>{birthdaysWeek.length === 0 ? (<div className="p-6 text-center text-gray-500">No upcoming birthdays this week.</div>) : (birthdaysWeek.map((person, idx) => <BirthdayRow key={idx} person={person} />))}</div></div><div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"><div className="bg-gray-50 border-b border-gray-200 p-4 font-bold text-gray-800 flex items-center gap-2 text-lg"><span>🗓️</span> Later This Month</div><div>{birthdaysMonth.length === 0 ? (<div className="p-6 text-center text-gray-500">No other birthdays later this month.</div>) : (birthdaysMonth.map((person, idx) => <BirthdayRow key={idx} person={person} />))}</div></div></div>)}
+        {activeView === 'tasks' && isAdmin && (<div className="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-sm border"><button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6"><ArrowLeft size={16} /> Back to Dashboard</button><div className="flex items-center justify-between mb-6"><div className="flex items-center gap-2"><Heart className="text-orange-500" size={28} /><h2 className="text-2xl font-bold text-gray-900">Follow-Up Workflow</h2></div><span className="bg-orange-100 text-orange-800 px-4 py-1 rounded-full text-sm font-bold">{crmTasks.length} Pending Tasks</span></div><p className="text-gray-600 mb-6">These tasks are automatically generated based on member registration and attendance patterns. Click the message icons to instantly send the appropriate template.</p><div className="space-y-4">{crmTasks.length === 0 ? (<div className="text-center p-8 bg-gray-50 rounded-lg text-gray-500">Amazing! Your follow-up queue is completely empty.</div>) : (crmTasks.map((task, idx) => (<div key={idx} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4"><div><div className="flex items-center gap-3 mb-1"><h3 className="font-bold text-gray-900 text-lg">{task.member.full_name}</h3><span className={`text-xs font-bold px-2 py-1 rounded ${task.color}`}>{task.type}</span></div><p className="text-gray-600 text-sm">{task.description}</p><p className="text-gray-400 text-xs mt-1">Phone: {task.member.phone_number || 'N/A'}</p></div><div className="flex items-center gap-3 shrink-0"><button onClick={() => handleSendMessage(task.member.phone_number, task.member.full_name, 'whatsapp', task.msgTemplate)} className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 px-4 py-2 rounded-md hover:bg-green-100 font-medium transition-colors"><MessageCircle size={18}/> WhatsApp</button><button onClick={() => handleSendMessage(task.member.phone_number, task.member.full_name, 'sms', task.msgTemplate)} className="flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 px-4 py-2 rounded-md hover:bg-blue-100 font-medium transition-colors"><MessageSquare size={18}/> SMS</button></div></div>)))}</div></div>)}
         {activeView === 'guests' && isAdmin && (<div className="max-w-6xl mx-auto bg-white p-6 rounded-xl shadow-sm border"><button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6"><ArrowLeft size={16} /> Back to Dashboard</button><div className="flex items-center gap-2 mb-4"><ClipboardList className="text-orange-500" size={24} /><h2 className="text-2xl font-bold">Guest Follow-Up Roster</h2></div><div className="overflow-x-auto border border-gray-200 rounded-lg"><table className="w-full text-left border-collapse"><thead><tr className="bg-gray-50 border-b border-gray-200 text-sm font-semibold text-gray-700"><th className="p-4">Name</th><th className="p-4">Status</th><th className="p-4">Phone</th><th className="p-4">Send Message</th></tr></thead><tbody className="divide-y divide-gray-200">{guestList.length === 0 ? (<tr><td colSpan={4} className="p-6 text-center text-gray-500">No guests found.</td></tr>) : (guestList.map((guest, idx) => (<tr key={idx} className="hover:bg-orange-50"><td className="p-4 font-medium text-gray-900">{guest.full_name}</td><td className="p-4"><span className={`px-3 py-1 rounded-full text-xs font-bold ${guest.status === '1st Timer' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}`}>{guest.status}</span></td><td className="p-4 text-gray-600">{guest.phone_number || '-'}</td><td className="p-4"><div className="flex items-center gap-3"><button onClick={() => handleSendMessage(guest.phone_number, guest.full_name, 'whatsapp')} className="text-green-600 hover:bg-green-100 p-2 rounded-full transition-colors" title="Send WhatsApp"><MessageCircle size={20} /></button><button onClick={() => handleSendMessage(guest.phone_number, guest.full_name, 'sms')} className="text-blue-600 hover:bg-blue-100 p-2 rounded-full transition-colors" title="Send SMS"><MessageSquare size={20} /></button></div></td></tr>)))}</tbody></table></div></div>)}
         {activeView === 'absentees' && isAdmin && (<div className="max-w-6xl mx-auto bg-white p-6 rounded-xl shadow-sm border"><button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6"><ArrowLeft size={16} /> Back to Dashboard</button><div className="flex items-center gap-2 mb-4"><UserMinus className="text-red-600" size={24} /><h2 className="text-2xl font-bold text-red-700">Absentee Alert (14+ Days)</h2></div><div className="overflow-x-auto border border-red-200 rounded-lg"><table className="w-full text-left border-collapse"><thead><tr className="bg-red-50 border-b border-red-200 text-sm font-semibold text-red-800"><th className="p-4">Name</th><th className="p-4">Phone Number</th><th className="p-4">Send Message</th><th className="p-4">AI Drafter</th></tr></thead><tbody className="divide-y divide-gray-200">{absenteeList.length === 0 ? (<tr><td colSpan={4} className="p-6 text-center text-gray-500 font-medium">Amazing! Everyone is accounted for.</td></tr>) : (absenteeList.map((person, idx) => (<tr key={idx} className="hover:bg-red-50 transition-colors"><td className="p-4 font-medium text-gray-900">{person.full_name}</td><td className="p-4 text-gray-600">{person.phone_number || '-'}</td><td className="p-4"><div className="flex items-center gap-3"><button onClick={() => handleSendMessage(person.phone_number, person.full_name, 'whatsapp')} className="text-green-600 hover:bg-green-100 p-2 rounded-full transition-colors" title="Send WhatsApp"><MessageCircle size={20} /></button><button onClick={() => handleSendMessage(person.phone_number, person.full_name, 'sms')} className="text-blue-600 hover:bg-blue-100 p-2 rounded-full transition-colors" title="Send SMS"><MessageSquare size={20} /></button></div></td><td className="p-4"><button onClick={() => {setActiveView('outreach'); setPromptContext(`Draft a warm, caring "we miss you" message to ${person.full_name} who hasn't been to church in a couple of weeks.`);}} className="text-xs bg-white border border-red-300 text-red-600 px-3 py-1 rounded hover:bg-red-600 hover:text-white transition-colors">Custom AI Draft</button></td></tr>)))}</tbody></table></div></div>)}
         {activeView === 'outreach' && isAdmin && (<div className="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-sm border"><button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6"><ArrowLeft size={16} /> Back to Dashboard</button><div className="flex items-center gap-2 mb-4"><Sparkles className="text-orange-500" size={24} /><h2 className="text-2xl font-bold">AI Outreach Drafter</h2></div><div className="space-y-4 max-w-2xl"><textarea rows={4} value={promptContext} onChange={(e) => setPromptContext(e.target.value)} className="w-full border border-gray-300 rounded-md p-3 resize-none focus:ring-2 focus:ring-orange-500" placeholder="Message details..." /><button onClick={handleGenerateMessage} disabled={isGenerating || !promptContext} className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 font-medium">{isGenerating ? 'Drafting...' : 'Generate Message'}</button>{generatedMessage && <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-lg"><h3 className="text-sm font-semibold text-gray-700 mb-2">Drafted Message:</h3><div className="text-gray-800 whitespace-pre-wrap">{generatedMessage}</div></div>}</div></div>)}
