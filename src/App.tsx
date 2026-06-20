@@ -7,6 +7,20 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// --- DESIGN SYSTEM: SIGNATURE CREST ---
+const GraceCrest = ({ className = "w-8 h-8", opacity = 1 }) => (
+  <svg className={className} viewBox="0 0 100 100" style={{ opacity }}>
+    {/* Sacred Geometry: Interlocking Rings */}
+    <circle cx="50" cy="50" r="46" fill="none" stroke="#C8A24D" strokeWidth="1.5" />
+    <circle cx="50" cy="30" r="24" fill="none" stroke="#C8A24D" strokeWidth="0.75" opacity="0.4"/>
+    <circle cx="50" cy="70" r="24" fill="none" stroke="#C8A24D" strokeWidth="0.75" opacity="0.4"/>
+    <circle cx="30" cy="50" r="24" fill="none" stroke="#C8A24D" strokeWidth="0.75" opacity="0.4"/>
+    <circle cx="70" cy="50" r="24" fill="none" stroke="#C8A24D" strokeWidth="0.75" opacity="0.4"/>
+    {/* Central Monogram */}
+    <text x="50" y="58" fontFamily="'Cinzel', serif" fontSize="28" fontWeight="bold" fill="#C8A24D" textAnchor="middle" letterSpacing="2">GC</text>
+  </svg>
+);
+
 // --- MESSAGE TEMPLATES ---
 const TEMPLATES = {
   welcome: "Hello {name}, welcome to Grace Citadel! We are so blessed to have you with us. We'd love to see you again this weekend!",
@@ -40,11 +54,9 @@ export default function App() {
   const [absenteeList, setAbsenteeList] = useState<any[]>([]);
   const [crmTasks, setCrmTasks] = useState<any[]>([]);
 
-  // --- BULK MESSAGE STATE ---
+  // --- BULK MESSAGE QUEUE STATES ---
   const [bulkGroup, setBulkGroup] = useState('Student');
   const [bulkText, setBulkText] = useState(TEMPLATES.bulk_student);
-  
-  // 🔥 NEW: WHATSAPP QUEUE STATES 🔥
   const [bulkQueue, setBulkQueue] = useState<{ name: string; phone: string }[]>([]);
   const [bulkQueueIndex, setBulkQueueIndex] = useState(0);
 
@@ -84,6 +96,7 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [checkinStatusMessage, setCheckinStatusMessage] = useState('');
 
+  // --- 1. THE SECURITY GUARD ---
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setSession(session));
@@ -94,6 +107,7 @@ export default function App() {
   const isUsher = userEmail.includes('usher');
   const isAdmin = !isUsher;
 
+  // --- 2. FETCH DASHBOARD DATA ---
   useEffect(() => {
     if (session && isAdmin) {
         if (activeView === 'dashboard') { fetchBirthdays(); fetchCrmTasks(); }
@@ -109,6 +123,7 @@ export default function App() {
     }
   }, [session, activeView, isAdmin]);
 
+  // --- DATA FETCHING ---
   const fetchBirthdays = async () => {
     const { data } = await supabase.from('members').select('full_name, date_of_birth, phone_number');
     if (data) {
@@ -165,7 +180,7 @@ export default function App() {
             const growth = cg.history.length > 1 ? (cg.history[cg.history.length - 1].count - cg.history[0].count) : 0;
             return { ...cg, avg, growth };
         });
-        setCellStats({ overallAvg, bestCell: [...cellsArray].sort((a, b) => b.avg - a.avg)[0]?.name || 'N/A', fastestGrowing: [...cellsArray].sort((a, b) => b.growth - a.growth)[0]?.name || 'N/A', trendData: Object.values(monthlyTrend).sort((a: any, b: any) => a.sortDate - b.sortDate), cellsArray: cellsArray.sort((a, b) => b.avg - a.avg) });
+        setCellStats({ overallAvg, bestCell: [...cellsArray].sort((a, b) => b.avg - a.avg)[0]?.name || '-', fastestGrowing: [...cellsArray].sort((a, b) => b.growth - a.growth)[0]?.name || '-', trendData: Object.values(monthlyTrend).sort((a: any, b: any) => a.sortDate - b.sortDate), cellsArray: cellsArray.sort((a, b) => b.avg - a.avg) });
     }
   };
   
@@ -181,9 +196,9 @@ export default function App() {
         if (lastCheckin) missedCount = globalServiceDates.filter(date => date > lastCheckin).length;
         else missedCount = globalServiceDates.filter(date => date >= new Date(member.created_at || new Date()).toISOString().split('T')[0]).length;
         if (missedCount >= 2) {
-          let alertLevel = 'Yellow Alert'; let colorClass = 'bg-yellow-100 text-yellow-800 border-yellow-300'; let icon = '🟡';
-          if (missedCount >= 8) { alertLevel = 'Red Alert'; colorClass = 'bg-red-100 text-red-800 border-red-300'; icon = '🚨'; } 
-          else if (missedCount >= 4) { alertLevel = 'Orange Alert'; colorClass = 'bg-orange-100 text-orange-800 border-orange-300'; icon = '🟧'; }
+          let alertLevel = 'Yellow Alert'; let colorClass = 'bg-[#C8A24D]/10 text-[#C8A24D] border-[#C8A24D]/30'; let icon = '🟡';
+          if (missedCount >= 8) { alertLevel = 'Red Alert'; colorClass = 'bg-[#6E1E2B]/10 text-[#6E1E2B] border-[#6E1E2B]/30'; icon = '🚨'; } 
+          else if (missedCount >= 4) { alertLevel = 'Orange Alert'; colorClass = 'bg-[#C8A24D]/20 text-[#C8A24D] border-[#C8A24D]'; icon = '🟧'; }
           smartAbsentees.push({ ...member, missedCount, alertLevel, colorClass, icon });
         }
       });
@@ -203,11 +218,14 @@ export default function App() {
       const daysSinceCreated = Math.floor((today.getTime() - createdDate.getTime()) / (1000 * 3600 * 24));
       const lastCheckinStr = lastCheckinMap[member.full_name];
       let missedCount = 0; if (lastCheckinStr) missedCount = sortedDates.filter(date => date > lastCheckinStr).length; else missedCount = sortedDates.filter(date => date >= createdDate.toISOString().split('T')[0]).length;
-      if (member.status === '1st Timer' && daysSinceCreated >= 1 && daysSinceCreated <= 3) newTasks.push({ priority: 1, type: 'Day 2 Follow-Up', color: 'bg-green-100 text-green-800', member, description: 'New guest! Send a warm welcome message.', msgTemplate: 'welcome' });
-      else if (member.status === '1st Timer' && missedCount >= 1 && daysSinceCreated >= 7) newTasks.push({ priority: 2, type: 'Guest Check-In', color: 'bg-yellow-100 text-yellow-800', member, description: 'Did not return for week 2.', msgTemplate: 'missed' });
-      if (missedCount >= 8) newTasks.push({ priority: 3, type: '🚨 RED ALERT', color: 'bg-red-100 text-red-800', member, description: `Missed ${missedCount} services.`, msgTemplate: 'checking_in' });
-      else if (missedCount >= 4) newTasks.push({ priority: 4, type: '🟧 ORANGE ALERT', color: 'bg-orange-100 text-orange-800', member, description: `Missed ${missedCount} services.`, msgTemplate: 'checking_in' });
-      else if (missedCount >= 2 && member.status === 'Regular') newTasks.push({ priority: 5, type: '🟡 YELLOW ALERT', color: 'bg-yellow-100 text-yellow-800', member, description: `Missed ${missedCount} services.`, msgTemplate: 'missed' });
+      
+      // Mapped colors to the new disciplined palette
+      if (member.status === '1st Timer' && daysSinceCreated >= 1 && daysSinceCreated <= 3) newTasks.push({ priority: 1, type: 'Day 2 Follow-Up', color: 'bg-[#0B1330]/10 text-[#0B1330]', member, description: 'New guest! Send a warm welcome message.', msgTemplate: 'welcome' });
+      else if (member.status === '1st Timer' && missedCount >= 1 && daysSinceCreated >= 7) newTasks.push({ priority: 2, type: 'Guest Check-In', color: 'bg-[#C8A24D]/10 text-[#C8A24D]', member, description: 'Did not return for week 2.', msgTemplate: 'missed' });
+      
+      if (missedCount >= 8) newTasks.push({ priority: 3, type: '🚨 RED ALERT', color: 'bg-[#6E1E2B]/10 text-[#6E1E2B]', member, description: `Missed ${missedCount} services.`, msgTemplate: 'checking_in' });
+      else if (missedCount >= 4) newTasks.push({ priority: 4, type: '🟧 ORANGE ALERT', color: 'bg-[#C8A24D]/20 text-[#C8A24D]', member, description: `Missed ${missedCount} services.`, msgTemplate: 'checking_in' });
+      else if (missedCount >= 2 && member.status === 'Regular') newTasks.push({ priority: 5, type: '🟡 YELLOW ALERT', color: 'bg-[#C8A24D]/10 text-[#C8A24D]', member, description: `Missed ${missedCount} services.`, msgTemplate: 'missed' });
     });
     setCrmTasks(newTasks.sort((a, b) => a.priority - b.priority));
   };
@@ -238,7 +256,7 @@ export default function App() {
     else window.open(`sms:${cleanPhone}?body=${encodeURIComponent(message)}`, '_blank');
   };
 
-  // 🔥 NEW: WHATSAPP QUEUE LOGIC 🔥
+  // --- WHATSAPP BULK QUEUE LOGIC ---
   const prepareBulkQueue = async () => {
     setIsSubmitting(true);
     const { data: targets } = await supabase.from('members').select('full_name, phone_number, gender, status, occupation');
@@ -250,25 +268,17 @@ export default function App() {
     if (bulkGroup === 'Men') filtered = targets.filter(m => m.gender === 'Male');
     if (bulkGroup === 'Women') filtered = targets.filter(m => m.gender === 'Female');
 
-    const queue = filtered
-      .filter(m => m.phone_number)
-      .map(m => ({ name: m.full_name, phone: m.phone_number as string }));
-
+    const queue = filtered.filter(m => m.phone_number).map(m => ({ name: m.full_name, phone: m.phone_number as string }));
     if (queue.length === 0) return alert('No valid phone numbers found for this group.');
     
-    // Set the queue active
-    setBulkQueue(queue);
-    setBulkQueueIndex(0);
+    setBulkQueue(queue); setBulkQueueIndex(0);
   };
 
   const sendNextInQueue = () => {
     const recipient = bulkQueue[bulkQueueIndex];
     if (!recipient) return;
-    
-    // Replace {name} placeholder if it exists in the bulk script
     const personalizedText = bulkText.replace('{name}', recipient.name);
     const cleanPhone = recipient.phone.replace(/\D/g, '');
-    
     window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(personalizedText)}`, '_blank');
     setBulkQueueIndex(prev => prev + 1);
   };
@@ -288,6 +298,7 @@ export default function App() {
     setIsSubmitting(false);
   };
 
+  // --- FORM SUBMISSIONS ---
   const handleLogin = async (e: React.FormEvent) => { e.preventDefault(); setIsAuthenticating(true); setAuthError(''); const { error } = await supabase.auth.signInWithPassword({ email: loginEmail, password: loginPassword }); if (error) setAuthError(error.message); setIsAuthenticating(false); };
   const handleLogout = async () => { await supabase.auth.signOut(); setActiveView('dashboard'); };
 
@@ -316,15 +327,14 @@ export default function App() {
   
   const handleSaveCheckins = async () => {
     if (selectedMembers.length === 0) return setCheckinStatusMessage('❌ Please select at least one member.');
-    setIsSubmitting(true); 
-    setCheckinStatusMessage('Verifying against duplicates and saving...');
+    setIsSubmitting(true); setCheckinStatusMessage('Verifying against duplicates and saving...');
     try {
       const selectedObjects = memberList.filter(m => selectedMembers.includes(m.id));
       const namesToInsert = selectedObjects.map(m => m.full_name);
       const { data: existingCheckins } = await supabase.from('member_checkins').select('member_name').eq('service_date', checkinDate).in('member_name', namesToInsert);
       const alreadyCheckedIn = new Set(existingCheckins?.map(c => c.member_name) || []);
       const validObjects = selectedObjects.filter(m => !alreadyCheckedIn.has(m.full_name));
-      if (validObjects.length === 0) { setCheckinStatusMessage('⚠️ Alert: Everyone selected has already been checked in for this date.'); setIsSubmitting(false); return; }
+      if (validObjects.length === 0) { setCheckinStatusMessage('⚠️ Alert: Everyone selected is already checked in.'); setIsSubmitting(false); return; }
       const recordsToInsert = validObjects.map(m => ({ service_date: checkinDate, member_name: m.full_name }));
       const { error: insertError } = await supabase.from('member_checkins').insert(recordsToInsert);
       if (insertError) throw insertError;
@@ -336,162 +346,638 @@ export default function App() {
         if (firstTimersToUpdate.length > 0) await supabase.from('members').update({ status: '2nd Timer' }).in('full_name', firstTimersToUpdate);
         if (secondTimersToUpdate.length > 0) await supabase.from('members').update({ status: 'Regular' }).in('full_name', secondTimersToUpdate);
       }
-      setCheckinStatusMessage(`✅ Logged ${validObjects.length} members! ${alreadyCheckedIn.size > 0 ? `(${alreadyCheckedIn.size} duplicates skipped)` : ''}`);
+      setCheckinStatusMessage(`✅ Logged ${validObjects.length} members! ${alreadyCheckedIn.size > 0 ? `(${alreadyCheckedIn.size} skipped)` : ''}`);
       setSelectedMembers([]); setSearchTerm('');
     } catch (error: any) { setCheckinStatusMessage('❌ Error: ' + error.message); } finally { setIsSubmitting(false); }
   };
 
   const handleGenerateMessage = async () => {
     if (!promptContext) return; setIsGenerating(true); setGeneratedMessage('');
-    try { await new Promise(resolve => setTimeout(resolve, 2000)); setGeneratedMessage(`[ Simulated AI Response ]\n\nBlessings!\n\nThis is a placeholder message. Once you connect your Google Billing, the real Gemini AI will read your prompt ("${promptContext}") and automatically draft a beautiful, customized message right here!`); } catch (error: any) { setGeneratedMessage('❌ Error: ' + error.message); } finally { setIsGenerating(false); }
+    try { await new Promise(resolve => setTimeout(resolve, 2000)); setGeneratedMessage(`[ Simulated AI Response ]\n\nBlessings!\n\nOnce you connect Google Billing, Gemini AI will read "${promptContext}" and automatically draft a custom message.`); } catch (error: any) { setGeneratedMessage('❌ Error: ' + error.message); } finally { setIsGenerating(false); }
   };
 
   const BirthdayRow = ({ person }: { person: any }) => (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-100 last:border-0 p-4 hover:bg-gray-50 transition-colors gap-3">
-      <div><div className="font-bold text-gray-900 text-lg">{person.full_name}</div><div className="text-gray-500 text-sm">{person.date_of_birth} • {person.phone_number || 'No Phone'}</div></div>
-      <div className="flex items-center gap-2 flex-wrap"><button onClick={() => handleSendMessage(person.phone_number, person.full_name, 'whatsapp', 'birthday')} className="flex items-center gap-1 bg-green-50 border border-green-200 text-green-700 px-3 py-1.5 rounded hover:bg-green-100 text-sm font-medium transition-colors"><MessageCircle size={16}/> WhatsApp</button><button onClick={() => handleSendMessage(person.phone_number, person.full_name, 'sms', 'birthday')} className="flex items-center gap-1 bg-blue-50 border border-blue-200 text-blue-700 px-3 py-1.5 rounded hover:bg-blue-100 text-sm font-medium transition-colors"><MessageSquare size={16}/> SMS</button><button onClick={() => { setActiveView('outreach'); setPromptContext(`Draft a highly personalized, joyous, and prophetic birthday blessing for ${person.full_name} who is a member of Grace Citadel church.`); }} className="flex items-center gap-1 bg-purple-50 border border-purple-200 text-purple-700 px-3 py-1.5 rounded hover:bg-purple-100 text-sm font-medium transition-colors"><Sparkles size={16}/> AI Drafter</button></div>
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#C8A24D]/10 last:border-0 p-4 hover:bg-[#C8A24D]/5 transition-colors gap-3">
+      <div><div className="font-bold text-[#1C1730] text-lg font-inter">{person.full_name}</div><div className="text-[#1C1730]/60 text-sm font-plex">{person.date_of_birth} • {person.phone_number || 'No Phone'}</div></div>
+      <div className="flex items-center gap-2 flex-wrap">
+        <button onClick={() => handleSendMessage(person.phone_number, person.full_name, 'whatsapp', 'birthday')} className="flex items-center gap-1 bg-[#0B1330] text-[#F6F1E4] px-3 py-1.5 rounded hover:bg-[#2F1B4D] text-sm font-bold font-inter transition-colors"><MessageCircle size={16}/> WA</button>
+        <button onClick={() => handleSendMessage(person.phone_number, person.full_name, 'sms', 'birthday')} className="flex items-center gap-1 bg-transparent border border-[#0B1330]/30 text-[#0B1330] px-3 py-1.5 rounded hover:bg-[#0B1330]/5 text-sm font-bold font-inter transition-colors"><MessageSquare size={16}/> SMS</button>
+        <button onClick={() => { setActiveView('outreach'); setPromptContext(`Draft a highly personalized, joyous, and prophetic birthday blessing for ${person.full_name} who is a member of Grace Citadel church.`); }} className="flex items-center gap-1 bg-[#C8A24D] text-[#0B1330] px-3 py-1.5 rounded hover:bg-[#b59040] text-sm font-bold font-inter transition-colors"><Sparkles size={16}/> AI</button>
+      </div>
     </div>
   );
 
   const guestTasks = crmTasks.filter(t => t.member.status === '1st Timer' || t.member.status === '2nd Timer');
   const urgentMissingTasks = crmTasks.filter(t => t.type.includes('RED') || t.type.includes('ORANGE'));
 
+  // ==========================================
+  // UI RENDER: LOGIN SCREEN (ROYAL NAVY DRAMA)
+  // ==========================================
   if (!session) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-        <div className="bg-white p-8 rounded-2xl shadow-lg max-w-md w-full border border-gray-200">
-          <div className="flex justify-center mb-6"><div className="bg-orange-500 p-3 rounded-full text-white"><Lock size={32} /></div></div>
-          <h1 className="text-2xl font-bold text-center text-gray-900 mb-2">Grace Citadel ChMS</h1>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div><label className="block text-sm font-medium text-gray-700 mb-1">Email</label><input type="email" required value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} className="w-full border border-gray-300 rounded-md p-3 focus:ring-2 focus:ring-orange-500 outline-none" /></div>
-            <div><label className="block text-sm font-medium text-gray-700 mb-1">Password</label><input type="password" required value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} className="w-full border border-gray-300 rounded-md p-3 focus:ring-2 focus:ring-orange-500 outline-none" /></div>
-            {authError && <p className="text-red-600 text-sm font-medium">{authError}</p>}
-            <button type="submit" className="w-full bg-gray-900 text-white p-3 rounded-md font-medium transition-colors">Secure Sign In</button>
+      <div className="min-h-screen bg-[#0B1330] flex items-center justify-center p-4 relative overflow-hidden font-inter">
+        {/* Style injection for Google Fonts */}
+        <style dangerouslySetInnerHTML={{__html: `
+          @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Cormorant+Garamond:wght@600;700&family=IBM+Plex+Mono:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+          .font-cinzel { font-family: 'Cinzel', serif; }
+          .font-cormorant { font-family: 'Cormorant Garamond', serif; }
+          .font-plex { font-family: 'IBM Plex Mono', monospace; }
+          .font-inter { font-family: 'Inter', sans-serif; }
+        `}} />
+        <GraceCrest className="absolute w-[150vw] h-[150vw] -right-[30vw] -bottom-[30vw] pointer-events-none" opacity={0.03} />
+        
+        <div className="bg-[#F6F1E4] p-10 rounded-2xl shadow-2xl max-w-md w-full border border-[#C8A24D]/30 relative z-10">
+          <div className="flex justify-center mb-6"><GraceCrest className="w-20 h-20" opacity={1} /></div>
+          <h1 className="text-3xl font-cinzel font-bold text-center text-[#0B1330] mb-2 tracking-wide">Grace Citadel</h1>
+          <p className="text-center text-[#1C1730]/60 mb-8 font-inter uppercase tracking-widest text-xs font-bold">Command System</p>
+          <form onSubmit={handleLogin} className="space-y-5">
+            <div><label className="block text-sm font-bold text-[#1C1730] mb-1 font-inter">Email / Clearance</label><input type="email" required value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} className="w-full bg-white border border-[#C8A24D]/40 rounded-md p-3 focus:border-[#C8A24D] focus:ring-1 focus:ring-[#C8A24D] outline-none text-[#1C1730] font-inter" /></div>
+            <div><label className="block text-sm font-bold text-[#1C1730] mb-1 font-inter">Passcode</label><input type="password" required value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} className="w-full bg-white border border-[#C8A24D]/40 rounded-md p-3 focus:border-[#C8A24D] focus:ring-1 focus:ring-[#C8A24D] outline-none text-[#1C1730] font-inter" /></div>
+            {authError && <p className="text-[#6E1E2B] text-sm font-bold font-inter">{authError}</p>}
+            <button type="submit" disabled={isAuthenticating} className="w-full bg-[#0B1330] text-[#C8A24D] p-4 rounded-md font-bold font-inter tracking-wide hover:bg-[#2F1B4D] transition-colors shadow-lg border border-[#0B1330]">
+                {isAuthenticating ? 'Authorizing...' : 'Secure Access'}
+            </button>
           </form>
         </div>
       </div>
     );
   }
 
+  const maxMonthlyTotal = monthlyChartData.length > 0 ? Math.max(...monthlyChartData.map(d => d.total)) : 1;
+  const maxCellMonthlyTotal = cellStats.trendData.length > 0 ? Math.max(...cellStats.trendData.map(d => d.total)) : 1;
+
+  // ==========================================
+  // UI RENDER: MAIN APP (PARCHMENT, INK, GOLD)
+  // ==========================================
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <header className="bg-white shadow-sm border-b px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-4"><div className="bg-orange-500 p-2 rounded-lg text-white cursor-pointer" onClick={() => setActiveView('dashboard')}><Users size={24} /></div><div><h1 className="text-xl font-bold text-gray-900">Grace Citadel ChMS</h1></div></div>
-        <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2 text-sm border border-red-200 text-red-600 rounded-md hover:bg-red-50 font-medium"><LogOut size={16} /> Sign Out</button>
+    <div className="min-h-screen bg-[#EBE7DD] flex flex-col font-inter">
+      {/* Style injection for Google Fonts */}
+      <style dangerouslySetInnerHTML={{__html: `
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Cormorant+Garamond:wght@600;700&family=IBM+Plex+Mono:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+        .font-cinzel { font-family: 'Cinzel', serif; }
+        .font-cormorant { font-family: 'Cormorant Garamond', serif; }
+        .font-plex { font-family: 'IBM Plex Mono', monospace; }
+        .font-inter { font-family: 'Inter', sans-serif; }
+      `}} />
+
+      {/* HEADER: ROYAL NAVY CHROME */}
+      <header className="bg-[#0B1330] border-b-2 border-[#C8A24D] px-6 py-4 flex items-center justify-between shadow-md relative z-20">
+        <div className="flex items-center gap-4 cursor-pointer group" onClick={() => setActiveView('dashboard')}>
+          <GraceCrest className="w-12 h-12 transform group-hover:scale-105 transition-transform" />
+          <div>
+            <h1 className="text-2xl font-cinzel font-bold text-[#C8A24D] tracking-wide leading-none">Grace Citadel</h1>
+            <p className="text-[10px] text-[#F6F1E4]/70 font-inter uppercase tracking-[0.2em] mt-1 font-bold">Command System</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-4">
+            <span className="text-[#F6F1E4]/70 font-plex text-xs hidden md:inline">
+                {isAdmin ? 'ADMIN CLEARANCE' : 'USHER PORTAL'}
+            </span>
+            <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2 text-sm border border-[#C8A24D]/30 text-[#C8A24D] rounded-md hover:bg-[#2F1B4D] hover:border-[#C8A24D] font-bold transition-colors">
+                <LogOut size={16} /> Exit
+            </button>
+        </div>
       </header>
 
-      <main className="flex-1 p-6">
+      <main className="flex-1 p-6 relative">
+        <GraceCrest className="absolute w-[60vw] h-[60vw] -left-[10vw] top-[10vw] pointer-events-none fixed" opacity={0.03} />
         
-        {/* DASHBOARD VIEW */}
+        {/* DASHBOARD GRID */}
         {activeView === 'dashboard' && (
-          <div className="max-w-7xl mx-auto space-y-6">
+          <div className="max-w-7xl mx-auto space-y-6 relative z-10">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow"><h2 className="text-lg font-semibold mb-2 text-gray-900 flex items-center gap-2"><CheckSquare size={18} className="text-orange-500"/> Service Check-In</h2><button onClick={() => setActiveView('attendance')} className="text-blue-600 font-medium text-sm hover:underline">Log Attendance &rarr;</button></div>
-              <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow"><h2 className="text-lg font-semibold mb-2 text-gray-900 flex items-center gap-2"><UserPlus size={18} className="text-orange-500"/> Registration</h2><button onClick={() => {setActiveView('members'); setStatusMessage('');}} className="text-blue-600 font-medium text-sm hover:underline">Open Form &rarr;</button></div>
-              <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow"><h2 className="text-lg font-semibold mb-2 text-gray-900 flex items-center gap-2"><Home size={18} className="text-orange-500"/> Cell Meeting Log</h2><p className="text-gray-500 text-sm mb-4">Record weekly home fellowship attendance.</p><button onClick={() => {setActiveView('cell_log'); setCellStatusMessage('');}} className="text-blue-600 font-medium text-sm hover:underline">Submit Report &rarr;</button></div>
+              
+              {/* EVERYONE: PARCHMENT CARDS */}
+              <div className="bg-[#F6F1E4] p-6 rounded-xl shadow-sm border border-[#C8A24D]/20 hover:shadow-md hover:border-[#C8A24D]/50 transition-all cursor-pointer group" onClick={() => setActiveView('attendance')}>
+                  <h2 className="text-2xl font-cormorant font-bold mb-2 text-[#0B1330] flex items-center gap-3"><CheckSquare size={22} className="text-[#C8A24D]"/> Service Check-In</h2>
+                  <p className="text-[#1C1730]/70 text-sm font-inter">Log weekend service attendance roster.</p>
+              </div>
+              <div className="bg-[#F6F1E4] p-6 rounded-xl shadow-sm border border-[#C8A24D]/20 hover:shadow-md hover:border-[#C8A24D]/50 transition-all cursor-pointer group" onClick={() => {setActiveView('members'); setStatusMessage('');}}>
+                  <h2 className="text-2xl font-cormorant font-bold mb-2 text-[#0B1330] flex items-center gap-3"><UserPlus size={22} className="text-[#C8A24D]"/> Registration</h2>
+                  <p className="text-[#1C1730]/70 text-sm font-inter">Register new members and 1st timers.</p>
+              </div>
+              <div className="bg-[#F6F1E4] p-6 rounded-xl shadow-sm border border-[#C8A24D]/20 hover:shadow-md hover:border-[#C8A24D]/50 transition-all cursor-pointer group" onClick={() => {setActiveView('cell_log'); setCellStatusMessage('');}}>
+                  <h2 className="text-2xl font-cormorant font-bold mb-2 text-[#0B1330] flex items-center gap-3"><Home size={22} className="text-[#C8A24D]"/> Cell Meeting Log</h2>
+                  <p className="text-[#1C1730]/70 text-sm font-inter">Record weekly mid-week fellowship data.</p>
+              </div>
 
               {isAdmin && (
                 <>
-                  <div className="bg-gradient-to-br from-gray-900 to-gray-800 p-6 rounded-xl shadow-md border border-gray-700 hover:shadow-lg transition-shadow relative overflow-hidden"><h2 className="text-lg font-semibold mb-2 text-white flex items-center gap-2"><ShieldCheck size={18} className="text-orange-500"/> Pastoral Command Center</h2><p className="text-gray-400 text-sm mb-4">Your daily hub for birthdays, guests, and follow-ups.</p><button onClick={() => setActiveView('tasks')} className="text-orange-400 font-bold text-sm hover:underline">Open Command Center &rarr;</button></div>
-                  <div className="bg-white p-6 rounded-xl shadow-sm border border-indigo-200 hover:shadow-md transition-shadow"><h2 className="text-lg font-semibold mb-2 text-indigo-800 flex items-center gap-2"><TrendingUp size={18} className="text-indigo-600"/> Service & Cell Analytics</h2><p className="text-gray-500 text-sm mb-4">Visual charts of Sunday and Cell Group growth.</p><button onClick={() => setActiveView('analytics')} className="text-indigo-700 font-bold text-sm hover:underline">Open Dashboard 📊 &rarr;</button></div>
-                  <div className="bg-gradient-to-br from-green-900 to-emerald-800 p-6 rounded-xl shadow-md border border-emerald-700 hover:shadow-lg transition-shadow"><h2 className="text-lg font-semibold mb-2 text-white flex items-center gap-2"><Share2 size={18} className="text-green-400"/> Bulk Outreach Node</h2><p className="text-emerald-200 text-sm mb-4">Broadcast messages to Students, Men, or Women.</p><button onClick={() => setActiveView('bulk')} className="text-emerald-300 font-bold text-sm hover:underline">Open Bulk Engine 🚀 &rarr;</button></div>
-                  <div className="bg-white p-6 rounded-xl shadow-sm border hover:shadow-md transition-shadow"><h2 className="text-lg font-semibold mb-2 text-red-700 flex items-center gap-2"><UserMinus size={18} className="text-red-600"/> Smart Absentee Radar</h2><p className="text-gray-500 text-sm mb-4">Alerts for missed services.</p><button onClick={() => setActiveView('absentees')} className="text-red-600 font-medium text-sm hover:underline">View Radar Triage &rarr;</button></div>
-                  <div className="bg-white p-6 rounded-xl shadow-sm border border-blue-200 hover:shadow-md transition-shadow relative overflow-hidden">{birthdaysToday.length > 0 && <div className="absolute top-0 right-0 bg-blue-500 text-white text-xs font-bold px-3 py-1 rounded-bl-lg">Today!</div>}<h2 className="text-lg font-semibold mb-2 text-blue-800 flex items-center gap-2"><Gift size={18} className="text-blue-600"/> Birthday Dashboard</h2><p className="text-blue-600 text-sm mb-4">{birthdaysToday.length} today • {birthdaysWeek.length} this week</p><button onClick={() => setActiveView('birthdays')} className="text-blue-700 font-bold text-sm hover:underline">Manage Birthdays &rarr;</button></div>
+                  {/* ADMIN CHROME: NAVY & PURPLE */}
+                  <div className="bg-[#2F1B4D] p-6 rounded-xl shadow-lg border border-[#C8A24D]/50 hover:shadow-xl hover:border-[#C8A24D] transition-all cursor-pointer relative overflow-hidden group" onClick={() => setActiveView('tasks')}>
+                      <div className="absolute top-0 right-0 bg-[#6E1E2B] text-[#F6F1E4] font-plex text-xs font-bold px-3 py-1 rounded-bl-lg shadow-md">{crmTasks.length} PENDING</div>
+                      <h2 className="text-2xl font-cormorant font-bold mb-2 text-[#F6F1E4] flex items-center gap-3"><ShieldCheck size={22} className="text-[#C8A24D]"/> Pastoral Command</h2>
+                      <p className="text-[#F6F1E4]/70 text-sm font-inter">Centralized hub for all pastoral tasks.</p>
+                  </div>
+                  <div className="bg-[#0B1330] p-6 rounded-xl shadow-lg border border-[#C8A24D]/50 hover:shadow-xl hover:border-[#C8A24D] transition-all cursor-pointer group" onClick={() => setActiveView('analytics')}>
+                      <h2 className="text-2xl font-cormorant font-bold mb-2 text-[#F6F1E4] flex items-center gap-3"><TrendingUp size={22} className="text-[#C8A24D]"/> Intelligence Hub</h2>
+                      <p className="text-[#F6F1E4]/70 text-sm font-inter">Visual analytics for structural church growth.</p>
+                  </div>
+                  <div className="bg-[#0B1330] p-6 rounded-xl shadow-lg border border-[#C8A24D]/50 hover:shadow-xl hover:border-[#C8A24D] transition-all cursor-pointer group" onClick={() => setActiveView('bulk')}>
+                      <h2 className="text-2xl font-cormorant font-bold mb-2 text-[#F6F1E4] flex items-center gap-3"><Share2 size={22} className="text-[#C8A24D]"/> Outreach Node</h2>
+                      <p className="text-[#F6F1E4]/70 text-sm font-inter">Execute targeted demographic broadcast queues.</p>
+                  </div>
+
+                  {/* ADMIN CARDS: PARCHMENT */}
+                  <div className="bg-[#F6F1E4] p-6 rounded-xl shadow-sm border border-[#C8A24D]/20 hover:shadow-md hover:border-[#C8A24D]/50 transition-all cursor-pointer" onClick={() => setActiveView('absentees')}>
+                      <h2 className="text-2xl font-cormorant font-bold mb-2 text-[#0B1330] flex items-center gap-3"><UserMinus size={22} className="text-[#6E1E2B]"/> Radar Triage</h2>
+                      <p className="text-[#1C1730]/70 text-sm font-inter">Absentee heat-map and alert levels.</p>
+                  </div>
+                  <div className="bg-[#F6F1E4] p-6 rounded-xl shadow-sm border border-[#C8A24D]/20 hover:shadow-md hover:border-[#C8A24D]/50 transition-all cursor-pointer relative" onClick={() => setActiveView('birthdays')}>
+                      {birthdaysToday.length > 0 && <div className="absolute top-0 right-0 bg-[#0B1330] text-[#C8A24D] font-plex text-xs font-bold px-3 py-1 rounded-bl-lg shadow-sm border-l border-b border-[#C8A24D]/50">TODAY!</div>}
+                      <h2 className="text-2xl font-cormorant font-bold mb-2 text-[#0B1330] flex items-center gap-3"><Gift size={22} className="text-[#C8A24D]"/> Birthday Records</h2>
+                      <p className="text-[#1C1730]/70 text-sm font-inter">Manage upcoming congregational milestones.</p>
+                  </div>
+                  <div className="bg-[#F6F1E4] p-6 rounded-xl shadow-sm border border-[#C8A24D]/20 hover:shadow-md hover:border-[#C8A24D]/50 transition-all cursor-pointer" onClick={() => setActiveView('guests')}>
+                      <h2 className="text-2xl font-cormorant font-bold mb-2 text-[#0B1330] flex items-center gap-3"><ClipboardList size={22} className="text-[#C8A24D]"/> Guest Roster</h2>
+                      <p className="text-[#1C1730]/70 text-sm font-inter">Direct access to 1st and 2nd Timers.</p>
+                  </div>
                 </>
               )}
             </div>
           </div>
         )}
 
-        {/* --- 🔥 NEW: BULK OUTREACH WITH WHATSAPP QUEUE UI 🔥 --- */}
-        {activeView === 'bulk' && isAdmin && (
-            <div className="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                <button onClick={() => { setActiveView('dashboard'); setBulkQueue([]); }} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6"><ArrowLeft size={16} /> Back to Dashboard</button>
-                <div className="flex items-center gap-2 mb-4"><Share2 className="text-green-600" size={28} /><h2 className="text-2xl font-bold text-gray-900">Bulk Broadcast Engine</h2></div>
-                <p className="text-gray-600 text-sm mb-6">Select a targeted group, verify your script, and launch the broadcast queue.</p>
+        {/* --- 🔥 PASTORAL COMMAND CENTER (PURPLE & GOLD CHROME) 🔥 --- */}
+        {activeView === 'tasks' && isAdmin && (
+            <div className="max-w-6xl mx-auto space-y-6 relative z-10">
+                <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] transition-colors"><ArrowLeft size={16} /> Retreat to Dashboard</button>
                 
-                {bulkQueue.length > 0 ? (
-                    /* ACTIVE QUEUE UI */
-                    <div className="bg-green-50 p-6 rounded-xl border border-green-200">
-                        <div className="flex justify-between items-start mb-6">
-                            <div>
-                                <h3 className="font-bold text-green-900 text-xl flex items-center gap-2"><MessageCircle /> WhatsApp Queue Active</h3>
-                                <p className="text-sm text-green-700 mt-1">Sending to {bulkGroup} Group</p>
-                            </div>
-                            <div className="bg-green-200 text-green-800 font-bold px-4 py-2 rounded-lg">
-                                {bulkQueueIndex} / {bulkQueue.length} Sent
-                            </div>
+                <div className="bg-[#2F1B4D] p-8 rounded-xl shadow-xl border border-[#C8A24D]/40 text-[#F6F1E4] flex flex-col sm:flex-row items-center justify-between gap-6">
+                    <div>
+                        <h2 className="text-4xl font-cormorant font-bold flex items-center gap-3 tracking-wide"><ShieldCheck className="text-[#C8A24D]" size={36}/> Pastoral Command</h2>
+                        <p className="text-[#F6F1E4]/60 text-sm font-inter mt-1">Aggregated operational oversight node.</p>
+                    </div>
+                    <div className="flex gap-4">
+                        <button onClick={handleGenerateMondayReport} disabled={isSubmitting} className="flex items-center gap-2 bg-[#0B1330] hover:bg-[#1C1730] border border-[#C8A24D] text-[#C8A24D] px-5 py-3 rounded-lg font-bold text-sm font-inter transition-colors shadow-lg">
+                            <FileText size={18} /> Execute Weekly Report
+                        </button>
+                        <div className="bg-[#1C1730] border border-[#C8A24D]/50 px-6 py-2 rounded-lg text-center shadow-inner">
+                            <div className="text-2xl font-plex font-bold text-[#C8A24D]">{crmTasks.length}</div>
+                            <div className="text-[10px] text-[#F6F1E4]/50 font-bold uppercase tracking-widest font-inter">Queue</div>
                         </div>
+                    </div>
+                </div>
 
-                        {bulkQueueIndex < bulkQueue.length ? (
-                            <div className="bg-white p-6 rounded-lg border border-green-100 shadow-sm text-center">
-                                <p className="text-gray-500 mb-1">Up Next:</p>
-                                <p className="text-2xl font-bold text-gray-900 mb-6">{bulkQueue[bulkQueueIndex].name}</p>
-                                <div className="flex flex-col sm:flex-row justify-center gap-4">
-                                    <button onClick={sendNextInQueue} className="bg-green-600 text-white px-8 py-4 rounded-xl font-bold hover:bg-green-700 shadow-md transition-colors flex items-center justify-center gap-2">
-                                        Send & Load Next &rarr;
-                                    </button>
-                                    <button onClick={() => setBulkQueue([])} className="bg-red-50 text-red-600 border border-red-200 px-8 py-4 rounded-xl font-bold hover:bg-red-100 transition-colors">
-                                        Cancel Queue
-                                    </button>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="space-y-6">
+                        {/* PARCHMENT CONTENT SURFACES */}
+                        <div className="bg-[#F6F1E4] border border-[#C8A24D]/30 rounded-xl p-6 shadow-sm">
+                            <h3 className="text-2xl font-cormorant font-bold text-[#0B1330] mb-4 flex items-center gap-2"><Gift size={22} className="text-[#C8A24D]"/> Today's Birthdays</h3>
+                            {birthdaysToday.length === 0 ? <p className="text-[#1C1730]/50 text-sm font-inter font-bold italic">No milestones registered today.</p> : birthdaysToday.map((p, i) => (
+                                <div key={i} className="bg-white p-4 rounded-lg border border-[#C8A24D]/20 flex justify-between items-center mb-3 shadow-sm">
+                                    <span className="font-bold text-[#1C1730] font-inter text-lg">{p.full_name}</span>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => handleSendMessage(p.phone_number, p.full_name, 'whatsapp', 'birthday')} className="text-xs font-bold font-inter bg-[#0B1330] text-[#F6F1E4] px-3 py-2 rounded hover:bg-[#2F1B4D] transition-colors shadow">WA Dispatch</button>
+                                    </div>
                                 </div>
-                            </div>
-                        ) : (
-                            <div className="bg-white p-8 rounded-lg border border-green-100 shadow-sm text-center">
-                                <div className="text-4xl mb-4">🎉</div>
-                                <h3 className="text-2xl font-bold text-green-900 mb-2">Broadcast Complete!</h3>
-                                <p className="text-gray-600 mb-6">All {bulkQueue.length} messages have been sent.</p>
-                                <button onClick={() => setBulkQueue([])} className="bg-green-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-green-700">
-                                    Start New Broadcast
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                ) : (
-                    /* SETUP UI */
-                    <div className="space-y-5 max-w-2xl">
-                        <div>
-                            <label className="block text-sm font-bold text-gray-700 mb-2">Target Segment</label>
-                            <div className="flex gap-4">
-                                {['Student', 'Men', 'Women'].map(group => (
-                                    <label key={group} className="flex items-center gap-2 bg-gray-50 border px-4 py-3 rounded-md cursor-pointer select-none flex-1 hover:bg-gray-100 transition-colors">
-                                        <input type="radio" checked={bulkGroup === group} onChange={() => {
-                                            setBulkGroup(group); 
-                                            setBulkText(group === 'Student' ? TEMPLATES.bulk_student : TEMPLATES.bulk_men);
-                                        }} className="w-4 h-4 text-green-600" />
-                                        <span className="font-semibold text-gray-800">{group}</span>
-                                    </label>
-                                ))}
-                            </div>
+                            ))}
                         </div>
-
-                        <div>
-                            <label className="block text-sm font-bold text-gray-700 mb-1">Announcement Script</label>
-                            <p className="text-xs text-gray-500 mb-2">You can use <b>{`{name}`}</b> in the script to automatically insert their name!</p>
-                            <textarea rows={5} value={bulkText} onChange={(e) => setBulkText(e.target.value)} className="w-full border border-gray-300 rounded-md p-3 font-medium outline-none focus:ring-2 focus:ring-green-500" />
-                        </div>
-
-                        <div className="flex flex-col sm:flex-row gap-4 pt-2">
-                            <button onClick={prepareBulkQueue} disabled={isSubmitting} className="flex-1 bg-green-600 text-white font-bold py-4 rounded-xl shadow hover:bg-green-700 flex items-center justify-center gap-2 transition-colors disabled:opacity-50">
-                                {isSubmitting ? 'Loading...' : <><MessageCircle size={22}/> Start WhatsApp Queue</>}
-                            </button>
-                            <button onClick={handleSendBulkSMS} disabled={isSubmitting} className="flex-1 bg-blue-600 text-white font-bold py-4 rounded-xl shadow hover:bg-blue-700 flex items-center justify-center gap-2 transition-colors disabled:opacity-50">
-                                <MessageSquare size={22}/> Send Bulk SMS
-                            </button>
+                        <div className="bg-[#F6F1E4] border border-[#C8A24D]/30 rounded-xl p-6 shadow-sm">
+                            <h3 className="text-2xl font-cormorant font-bold text-[#0B1330] mb-4 flex items-center gap-2"><Sparkles size={22} className="text-[#C8A24D]"/> New Guest Operations</h3>
+                            {guestTasks.length === 0 ? <p className="text-[#1C1730]/50 text-sm font-inter font-bold italic">Queue cleared.</p> : guestTasks.map((t, i) => (
+                                <div key={i} className="bg-white p-4 rounded-lg border border-[#C8A24D]/20 flex justify-between items-center mb-3 shadow-sm">
+                                    <div>
+                                        <span className="font-bold text-[#1C1730] font-inter text-lg">{t.member.full_name}</span>
+                                        <p className="text-xs text-[#1C1730]/60 font-plex mt-1">{t.type}</p>
+                                    </div>
+                                    <button onClick={() => handleSendMessage(t.member.phone_number, t.member.full_name, 'whatsapp', t.msgTemplate)} className="bg-[#0B1330] text-[#C8A24D] p-3 rounded hover:bg-[#2F1B4D] transition-colors shadow"><MessageCircle size={18}/></button>
+                                </div>
+                            ))}
                         </div>
                     </div>
-                )}
+                    <div className="space-y-6">
+                        <div className="bg-[#F6F1E4] border border-[#6E1E2B]/30 rounded-xl p-6 shadow-sm relative overflow-hidden">
+                            <div className="absolute top-0 left-0 w-1 h-full bg-[#6E1E2B]"></div>
+                            <h3 className="text-2xl font-cormorant font-bold text-[#6E1E2B] mb-4 flex items-center gap-2"><UserMinus size={22}/> Urgent Triage: Missing</h3>
+                            {urgentMissingTasks.length === 0 ? <p className="text-[#1C1730]/50 text-sm font-inter font-bold italic">No critical absences detected.</p> : urgentMissingTasks.map((t, i) => (
+                                <div key={i} className="bg-white p-4 rounded-lg border border-[#6E1E2B]/20 flex justify-between items-center mb-3 shadow-sm">
+                                    <div>
+                                        <span className="font-bold text-[#1C1730] font-inter text-lg">{t.member.full_name}</span>
+                                        <p className="text-xs text-[#6E1E2B] font-inter font-bold mt-1">{t.description}</p>
+                                    </div>
+                                    <button onClick={() => handleSendMessage(t.member.phone_number, t.member.full_name, 'whatsapp', t.msgTemplate)} className="bg-[#6E1E2B] text-[#F6F1E4] p-3 rounded hover:bg-[#0B1330] transition-colors shadow"><MessageCircle size={18}/></button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
             </div>
         )}
 
-        {/* ... [ALL PREVIOUS MINIMIZED VIEWS: MEMBERS, ATTENDANCE, CELL_LOG, TASKS, ANALYTICS, ABSENTEES, BIRTHDAYS] ... */}
-        {activeView === 'members' && (<div className="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-sm border"><button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6"><ArrowLeft size={16} /> Back to Dashboard</button><h2 className="text-2xl font-bold mb-4">Registration Form</h2><form onSubmit={handleSaveMember} className="flex flex-col gap-4 max-w-md"><div className="bg-orange-50 p-4 rounded-lg border border-orange-100 mb-2"><label className="block text-sm font-bold text-orange-900 mb-1">Status Profile</label><select value={memberStatus} onChange={(e) => setMemberStatus(e.target.value)} className="w-full border border-orange-300 rounded-md p-2 bg-white"><option value="1st Timer">1st Timer</option><option value="2nd Timer">2nd Timer</option><option value="Student">Student Demographic</option><option value="Regular">Regular Member</option></select></div><div><label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label><input type="text" required value={name} onChange={(e) => setName(e.target.value)} className="w-full border border-gray-300 rounded-md p-2" /></div><div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-medium text-gray-700 mb-1">Gender</label><select value={gender} onChange={(e) => setGender(e.target.value)} className="w-full border border-gray-300 rounded-md p-2 bg-white"><option value="">Select...</option><option value="Male">Male</option><option value="Female">Female</option></select></div><div><label className="block text-sm font-medium text-gray-700 mb-1">Guarded Birthday</label><div className="flex gap-2"><select value={dobMonth} onChange={(e) => setDobMonth(e.target.value)} className="w-1/2 border border-gray-300 rounded-md p-2 bg-white"><option value="">Month</option>{['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map(m => <option key={m} value={m}>{m}</option>)}</select><select value={dobDay} onChange={(e) => setDobDay(e.target.value)} className="w-1/2 border border-gray-300 rounded-md p-2 bg-white"><option value="">Day</option>{[...Array(31)].map((_, i) => <option key={i+1} value={i+1}>{i+1}</option>)}</select></div></div></div><div><label className="block text-sm font-medium text-gray-700 mb-1">Phone</label><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full border border-gray-300 rounded-md p-2" /></div><button type="submit" className="bg-gray-900 text-white px-4 py-3 rounded-md font-medium">Save Registration</button>{statusMessage && <div className="p-3 bg-green-100 text-green-800 rounded-md text-sm">{statusMessage}</div>}</form></div>)}
-        {activeView === 'attendance' && (<div className="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-sm border"><button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6"><ArrowLeft size={16} /> Back to Dashboard</button><div className="flex items-center gap-2 mb-4"><CheckSquare className="text-orange-500" size={24} /><h2 className="text-2xl font-bold">Service Check-In</h2></div><div className="flex flex-col md:flex-row gap-4 mb-6"><div className="flex-1"><label className="block text-sm font-medium text-gray-700 mb-1">Service Date</label><input type="date" value={checkinDate} onChange={(e) => setCheckinDate(e.target.value)} className="w-full border border-gray-300 rounded-md p-2" /></div><div className="flex-[2]"><label className="block text-sm font-medium text-gray-700 mb-1">Quick Search</label><div className="relative"><input type="text" placeholder="Search by name..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full border border-gray-300 rounded-md py-2 px-3" /></div></div></div><div className="border border-gray-200 rounded-lg overflow-hidden mb-4"><div className="max-h-[60vh] overflow-y-auto p-2 bg-white">{memberList.filter(m => m.full_name.toLowerCase().includes(searchTerm.toLowerCase())).map((m, idx) => (<label key={idx} className="flex items-center gap-4 p-4 hover:bg-orange-50 rounded-md cursor-pointer border-b"><input type="checkbox" checked={selectedMembers.includes(m.id)} onChange={() => toggleMemberSelection(m.id)} className="w-6 h-6 text-orange-500" /><span className="text-gray-800 font-medium select-none text-lg">{m.full_name}</span></label>))}</div></div><button onClick={handleSaveCheckins} className="w-full md:w-auto bg-orange-500 text-white px-8 py-4 rounded-md font-bold text-lg shadow-md">Save Attendance</button>{checkinStatusMessage && <div className="p-4 bg-green-100 text-green-800 rounded-md mt-4">{checkinStatusMessage}</div>}</div>)}
-        {activeView === 'cell_log' && (<div className="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-sm border"><button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-6"><ArrowLeft size={16} /> Back to Dashboard</button><div className="flex items-center gap-2 mb-2"><Home className="text-orange-500" size={28} /><h2 className="text-2xl font-bold">Cell Meeting Report</h2></div><form onSubmit={handleSaveCellMeeting} className="flex flex-col gap-4 max-w-lg mt-6"><div><label className="block text-sm font-medium text-gray-700 mb-1">Cell Group Name</label><input type="text" required value={cellName} onChange={(e) => setCellName(e.target.value)} className="w-full border border-gray-300 rounded-md p-3 focus:border-orange-500" /></div><div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-medium text-gray-700 mb-1">Leader Name</label><input type="text" required value={cellLeader} onChange={(e) => setCellLeader(e.target.value)} className="w-full border border-gray-300 rounded-md p-3" /></div><div><label className="block text-sm font-medium text-gray-700 mb-1">Attendance</label><input type="number" required min="1" value={cellAttendance} onChange={(e) => setCellAttendance(e.target.value)} className="w-full border border-gray-300 rounded-md p-3" /></div></div><div><label className="block text-sm font-medium text-gray-700 mb-1">Meeting Date</label><input type="date" required value={cellDate} onChange={(e) => setCellDate(e.target.value)} className="w-full border border-gray-300 rounded-md p-3" /></div><div><label className="block text-sm font-medium text-gray-700 mb-1">Notes / Testimonies</label><textarea rows={4} value={cellNotes} onChange={(e) => setCellNotes(e.target.value)} className="w-full border border-gray-300 rounded-md p-3" /></div><button type="submit" disabled={isSubmitting} className="bg-gray-900 text-white p-4 rounded-md font-bold mt-2 hover:bg-gray-800">Submit Report</button>{cellStatusMessage && <div className="p-3 bg-green-100 text-green-800 rounded-md text-sm">{cellStatusMessage}</div>}</form></div>)}
-        {activeView === 'tasks' && isAdmin && (<div className="max-w-6xl mx-auto space-y-6"><button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800"><ArrowLeft size={16} /> Back to Dashboard</button><div className="bg-gradient-to-r from-gray-900 to-gray-800 p-6 rounded-xl shadow-md text-white flex flex-col sm:flex-row items-center justify-between gap-4"><div><h2 className="text-2xl font-bold flex items-center gap-2"><ShieldCheck className="text-orange-500"/> Pastoral Command Center</h2></div><div className="flex gap-4"><button onClick={handleGenerateMondayReport} className="flex items-center gap-2 bg-indigo-600 px-4 py-2 rounded-lg font-bold text-sm"><FileText size={18} /> Monday Report</button><div className="bg-gray-800 border px-6 py-2 rounded-lg text-center"><div className="text-xl font-black text-orange-500">{crmTasks.length}</div><div className="text-[10px] text-gray-400">TASKS</div></div></div></div><div className="grid grid-cols-1 lg:grid-cols-2 gap-6"><div className="space-y-6"><div className="bg-blue-50 border border-blue-200 rounded-xl p-4 shadow-sm"><h3 className="text-lg font-bold text-blue-900 mb-3 flex items-center gap-2"><Gift size={18}/> Today's Birthdays</h3>{birthdaysToday.map((p, i) => (<div key={i} className="bg-white p-3 rounded border flex justify-between mb-2"><span className="font-bold">{p.full_name}</span><div className="flex gap-1"><button onClick={() => handleSendMessage(p.phone_number, p.full_name, 'whatsapp', 'birthday')} className="text-xs bg-green-50 text-green-700 px-2 py-1 rounded">WA</button></div></div>))}</div><div className="bg-green-50 border border-green-200 rounded-xl p-4 shadow-sm"><h3 className="text-lg font-bold text-green-900 mb-3 flex items-center gap-2"><Sparkles size={18}/> Guests Follow-Up</h3>{guestTasks.map((t, i) => (<div key={i} className="bg-white p-3 rounded border flex justify-between mb-2"><div><span className="font-bold">{t.member.full_name}</span><p className="text-xs text-gray-500">{t.type}</p></div><button onClick={() => handleSendMessage(t.member.phone_number, t.member.full_name, 'whatsapp', t.msgTemplate)} className="text-xs bg-green-50 p-2 rounded-full"><MessageCircle size={14}/></button></div>))}</div></div><div className="space-y-6"><div className="bg-red-50 border border-red-200 rounded-xl p-4 shadow-sm"><h3 className="text-lg font-bold text-red-900 mb-3 flex items-center gap-2"><UserMinus size={18}/> Urgent: Missing</h3>{urgentMissingTasks.map((t, i) => (<div key={i} className="bg-white p-3 rounded border flex justify-between mb-2"><div><span className="font-bold">{t.member.full_name}</span><p className="text-xs text-red-500">{t.description}</p></div><button onClick={() => handleSendMessage(t.member.phone_number, t.member.full_name, 'whatsapp', t.msgTemplate)} className="text-xs bg-green-50 p-2 rounded-full"><MessageCircle size={14}/></button></div>))}</div></div></div></div>)}
-        {activeView === 'absentees' && isAdmin && (<div className="max-w-6xl mx-auto space-y-6"><button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800"><ArrowLeft size={16} /> Back to Dashboard</button><div className="overflow-x-auto border border-gray-200 rounded-xl bg-white p-4"><h3 className="font-bold text-xl mb-4">Smart Absentee Radar Triage</h3>{absenteeList.map((person, idx) => (<div key={idx} className="p-3 border-b flex justify-between items-center"><div><p className="font-bold">{person.full_name} ({person.alertLevel})</p><p className="text-xs text-gray-500">Missed: {person.missedCount} services</p></div><button onClick={() => handleSendMessage(person.phone_number, person.full_name, 'whatsapp', 'checking_in')} className="text-xs bg-green-50 border px-3 py-1 text-green-700 rounded">Message</button></div>))}</div></div>)}
-        {activeView === 'analytics' && isAdmin && (<div className="max-w-6xl mx-auto space-y-6"><button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800"><ArrowLeft size={16} /> Back to Dashboard</button><div className="bg-gradient-to-r from-indigo-700 to-purple-800 p-8 rounded-xl shadow-md text-white flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4"><div><h2 className="text-3xl font-bold mb-2 flex items-center gap-3"><TrendingUp size={32} /> Central Analytics Hub</h2></div><div className="flex bg-indigo-900/50 p-1 rounded-lg border border-indigo-600"><button onClick={() => setAnalyticsTab('service')} className={`px-6 py-2 rounded-md font-bold text-sm ${analyticsTab === 'service' ? 'bg-white text-indigo-900' : 'text-indigo-200'}`}>Sunday Services</button><button onClick={() => setAnalyticsTab('cells')} className={`px-6 py-2 rounded-md font-bold text-sm ${analyticsTab === 'cells' ? 'bg-white text-indigo-900' : 'text-indigo-200'}`}>Cell Groups</button></div></div>{analyticsTab === 'service' && (<><div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200"><h3 className="text-xl font-bold text-gray-800 mb-6 border-b pb-4"><BarChart3 className="inline"/> Monthly Growth</h3><div className="flex items-end gap-2 md:gap-6 h-64 mt-8 pb-4 border-b-2 overflow-x-auto">{monthlyChartData.map((data, idx) => { const barHeight = Math.max((data.total / maxMonthlyTotal) * 100, 5); return (<div key={idx} onClick={() => setSelectedMonthData(data)} className="flex flex-col items-center flex-1 min-w-[60px] cursor-pointer"><span className="text-xs font-bold mb-2">{data.total}</span><div style={{ height: `${barHeight}%` }} className="w-full rounded-t-md bg-indigo-600"></div><span className="text-xs mt-3 font-medium">{data.monthName.split(' ')[0]}</span></div>); })}</div></div></>)}{analyticsTab === 'cells' && (<><div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6"><div className="bg-white p-6 rounded-xl border flex items-center gap-4"><div className="bg-blue-100 p-3 rounded-full"><Users size={24} className="text-blue-600"/></div><div><p className="text-sm font-bold">Avg Size</p><p className="text-3xl font-black">{cellStats.overallAvg}</p></div></div><div className="bg-white p-6 rounded-xl border flex items-center gap-4"><div className="bg-yellow-100 p-3 rounded-full">🏆</div><div><p className="text-sm font-bold">Best Cell</p><p className="text-xl font-black">{cellStats.bestCell}</p></div></div><div className="bg-white p-6 rounded-xl border flex items-center gap-4"><div className="bg-green-100 p-3 rounded-full"><Activity size={24} className="text-green-600"/></div><div><p className="text-sm font-bold">Fastest Growth</p><p className="text-xl font-black">{cellStats.fastestGrowing}</p></div></div></div></>)}</div>)}
-        {activeView === 'birthdays' && isAdmin && (<div className="max-w-4xl mx-auto space-y-6"><button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800"><ArrowLeft size={16} /> Back to Dashboard</button><div className="bg-white p-4 border rounded-xl"><h3 className="font-bold text-lg mb-4">This Month's Birthdays</h3>{birthdaysMonth.map((p, idx) => <BirthdayRow key={idx} person={p} />)}</div></div>)}
+        {/* --- 🔥 OUTREACH NODE (BULK QUEUE) 🔥 --- */}
+        {activeView === 'bulk' && isAdmin && (
+            <div className="max-w-4xl mx-auto relative z-10">
+                <button onClick={() => { setActiveView('dashboard'); setBulkQueue([]); }} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] mb-6 transition-colors"><ArrowLeft size={16} /> Retreat to Dashboard</button>
+                
+                <div className="bg-[#0B1330] text-[#F6F1E4] p-8 rounded-t-2xl border-b border-[#C8A24D]">
+                    <h2 className="text-4xl font-cormorant font-bold flex items-center gap-3"><Share2 className="text-[#C8A24D]"/> Demographic Outreach Node</h2>
+                    <p className="text-[#F6F1E4]/60 font-inter text-sm mt-2">Initialize batch communication scripts to specific societal divisions.</p>
+                </div>
+                
+                <div className="bg-[#F6F1E4] p-8 rounded-b-2xl shadow-xl border border-t-0 border-[#C8A24D]/30">
+                    {bulkQueue.length > 0 ? (
+                        /* ACTIVE QUEUE UI */
+                        <div className="bg-white p-8 rounded-xl border border-[#C8A24D] shadow-inner">
+                            <div className="flex justify-between items-start mb-8">
+                                <div>
+                                    <h3 className="text-2xl font-cormorant font-bold text-[#0B1330] flex items-center gap-2"><MessageCircle className="text-[#C8A24D]" /> Dispatch Queue Active</h3>
+                                    <p className="text-sm font-plex text-[#1C1730]/60 mt-1 uppercase tracking-widest">Target: {bulkGroup} Division</p>
+                                </div>
+                                <div className="bg-[#0B1330] text-[#C8A24D] font-plex font-bold px-4 py-2 rounded shadow">
+                                    {bulkQueueIndex} / {bulkQueue.length}
+                                </div>
+                            </div>
+
+                            {bulkQueueIndex < bulkQueue.length ? (
+                                <div className="text-center py-6">
+                                    <p className="text-[#1C1730]/50 font-bold font-inter uppercase text-sm mb-2 tracking-widest">Next Target Assigned</p>
+                                    <p className="text-4xl font-cormorant font-bold text-[#0B1330] mb-8">{bulkQueue[bulkQueueIndex].name}</p>
+                                    <div className="flex flex-col sm:flex-row justify-center gap-4">
+                                        <button onClick={sendNextInQueue} className="bg-[#C8A24D] text-[#0B1330] px-8 py-4 rounded font-bold font-inter hover:bg-[#b59040] shadow-lg transition-colors flex items-center justify-center gap-2 tracking-wide">
+                                            Execute & Advance &rarr;
+                                        </button>
+                                        <button onClick={() => setBulkQueue([])} className="bg-transparent text-[#6E1E2B] border-2 border-[#6E1E2B] px-8 py-4 rounded font-bold font-inter hover:bg-[#6E1E2B]/10 transition-colors tracking-wide">
+                                            Abort Queue
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="text-center py-10">
+                                    <div className="text-5xl mb-4 text-[#C8A24D]">◆</div>
+                                    <h3 className="text-3xl font-cormorant font-bold text-[#0B1330] mb-2">Operation Complete</h3>
+                                    <p className="text-[#1C1730]/70 font-inter mb-8">All {bulkQueue.length} missives have been delivered.</p>
+                                    <button onClick={() => setBulkQueue([])} className="bg-[#0B1330] text-[#C8A24D] px-8 py-3 rounded font-bold font-inter hover:bg-[#2F1B4D] shadow">
+                                        Reset Node
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        /* SETUP UI */
+                        <div className="space-y-8 max-w-2xl">
+                            <div>
+                                <label className="block text-sm font-bold font-inter text-[#0B1330] mb-3 uppercase tracking-widest">Division Target</label>
+                                <div className="flex gap-4">
+                                    {['Student', 'Men', 'Women'].map(group => (
+                                        <label key={group} className={`flex items-center justify-center gap-2 border-2 px-6 py-4 rounded cursor-pointer select-none flex-1 transition-all ${bulkGroup === group ? 'border-[#C8A24D] bg-[#0B1330] text-[#C8A24D]' : 'border-[#C8A24D]/30 bg-white text-[#1C1730] hover:border-[#C8A24D]/60'}`}>
+                                            <input type="radio" checked={bulkGroup === group} onChange={() => {
+                                                setBulkGroup(group); 
+                                                setBulkText(group === 'Student' ? TEMPLATES.bulk_student : TEMPLATES.bulk_men);
+                                            }} className="hidden" />
+                                            <span className="font-bold font-inter">{group}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-bold font-inter text-[#0B1330] mb-1 uppercase tracking-widest">Script Formulation</label>
+                                <p className="text-xs text-[#1C1730]/60 font-inter mb-3 font-bold">Inject <code className="text-[#C8A24D] bg-[#0B1330] px-1 py-0.5 rounded">{"{name}"}</code> for dynamic target insertion.</p>
+                                <textarea rows={6} value={bulkText} onChange={(e) => setBulkText(e.target.value)} className="w-full bg-white border border-[#C8A24D]/40 rounded-md p-4 font-inter text-[#1C1730] outline-none focus:border-[#C8A24D] focus:ring-1 focus:ring-[#C8A24D] shadow-inner" />
+                            </div>
+
+                            <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t border-[#C8A24D]/20">
+                                <button onClick={prepareBulkQueue} disabled={isSubmitting} className="flex-1 bg-[#C8A24D] text-[#0B1330] font-bold font-inter tracking-wide py-4 rounded shadow-lg hover:bg-[#b59040] flex items-center justify-center gap-2 transition-colors disabled:opacity-50">
+                                    {isSubmitting ? 'Processing...' : <><MessageCircle size={22}/> Initialize WA Queue</>}
+                                </button>
+                                <button onClick={handleSendBulkSMS} disabled={isSubmitting} className="flex-1 bg-[#0B1330] text-[#C8A24D] font-bold font-inter tracking-wide py-4 rounded shadow-lg hover:bg-[#2F1B4D] flex items-center justify-center gap-2 transition-colors disabled:opacity-50 border border-[#C8A24D]/50">
+                                    <MessageSquare size={22}/> Execute SMS Batch
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        )}
+
+        {/* --- 🔥 INTELLIGENCE HUB (ANALYTICS) 🔥 --- */}
+        {activeView === 'analytics' && isAdmin && (
+          <div className="max-w-6xl mx-auto space-y-6 relative z-10">
+            <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] transition-colors"><ArrowLeft size={16} /> Retreat to Dashboard</button>
+            
+            <div className="bg-[#0B1330] p-8 rounded-xl shadow-xl border border-[#C8A24D]/40 text-[#F6F1E4] flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div>
+                    <h2 className="text-4xl font-cormorant font-bold mb-2 flex items-center gap-3"><TrendingUp size={36} className="text-[#C8A24D]"/> Intelligence Hub</h2>
+                    <p className="text-[#F6F1E4]/60 font-inter text-sm">Structural growth and metric analysis.</p>
+                </div>
+                <div className="flex bg-[#1C1730] p-1 rounded border border-[#C8A24D]/30 shadow-inner">
+                    <button onClick={() => setAnalyticsTab('service')} className={`px-6 py-2 rounded font-bold font-inter text-sm tracking-wide transition-all ${analyticsTab === 'service' ? 'bg-[#C8A24D] text-[#0B1330]' : 'text-[#C8A24D] hover:text-[#F6F1E4]'}`}>Congregation</button>
+                    <button onClick={() => setAnalyticsTab('cells')} className={`px-6 py-2 rounded font-bold font-inter text-sm tracking-wide transition-all ${analyticsTab === 'cells' ? 'bg-[#C8A24D] text-[#0B1330]' : 'text-[#C8A24D] hover:text-[#F6F1E4]'}`}>Cell Sectors</button>
+                </div>
+            </div>
+
+            {/* TAB: SUNDAY SERVICES */}
+            {analyticsTab === 'service' && (
+                <>
+                    <div className="bg-[#F6F1E4] p-8 rounded-xl shadow-sm border border-[#C8A24D]/30">
+                        <h3 className="text-2xl font-cormorant font-bold text-[#0B1330] mb-8 border-b-2 border-[#C8A24D]/20 pb-4">Monthly Trajectory</h3>
+                        {monthlyChartData.length === 0 ? (<div className="text-center p-12 text-[#1C1730]/50 font-plex italic">Insufficient data points.</div>) : (
+                            <div className="flex items-end gap-2 md:gap-6 h-64 mt-8 pb-4 border-b border-[#0B1330]/10 overflow-x-auto">
+                                {monthlyChartData.map((data, idx) => {
+                                    const barHeight = Math.max((data.total / maxMonthlyTotal) * 100, 5);
+                                    const isSelected = selectedMonthData?.monthName === data.monthName;
+                                    return (
+                                        <div key={idx} onClick={() => setSelectedMonthData(data)} className="flex flex-col items-center flex-1 min-w-[60px] group cursor-pointer">
+                                            <span className={`text-sm font-plex font-bold mb-2 transition-colors ${isSelected ? 'text-[#0B1330] scale-110' : 'text-[#1C1730]/40 group-hover:text-[#C8A24D]'}`}>{data.total}</span>
+                                            <div style={{ height: `${barHeight}%` }} className={`w-full rounded-t-sm transition-all duration-300 ${isSelected ? 'bg-[#0B1330] shadow-lg' : 'bg-[#C8A24D]/60 group-hover:bg-[#C8A24D]'}`}></div>
+                                            <span className={`text-xs mt-3 whitespace-nowrap font-inter font-bold uppercase tracking-widest ${isSelected ? 'text-[#0B1330]' : 'text-[#1C1730]/50'}`}>{data.monthName.split(' ')[0]}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="bg-[#F6F1E4] rounded-xl shadow-sm border border-[#C8A24D]/30 overflow-hidden">
+                            <div className="bg-[#0B1330] p-5 border-b border-[#C8A24D]/40">
+                                <h3 className="text-xl font-cormorant font-bold text-[#C8A24D] flex items-center gap-2"><CalendarDays size={20}/> {selectedMonthData ? `Vector: ${selectedMonthData.monthName}` : 'Select a vector above'}</h3>
+                            </div>
+                            <div className="p-0">
+                                {!selectedMonthData ? (<div className="p-12 text-center text-[#1C1730]/50 font-plex italic">Awaiting selection.</div>) : (
+                                    <table className="w-full text-left border-collapse">
+                                        <thead><tr className="bg-white border-b border-[#C8A24D]/20 text-xs font-inter uppercase tracking-widest text-[#1C1730]/60 font-bold"><th className="p-5">Temporal Index</th><th className="p-5">Volume</th></tr></thead>
+                                        <tbody className="divide-y divide-[#C8A24D]/10">
+                                            {Object.entries(selectedMonthData.services).sort().map(([date, count]: [string, any], idx) => (
+                                                <tr key={idx} className="hover:bg-[#C8A24D]/5 transition-colors bg-[#F6F1E4]">
+                                                    <td className="p-5 font-bold font-inter text-[#1C1730]">{new Date(date).toLocaleDateString()}</td>
+                                                    <td className="p-5 font-plex font-bold text-[#0B1330] text-lg">{count}</td>
+                                                </tr>
+                                            ))}
+                                            <tr className="bg-[#C8A24D] text-[#0B1330] border-t-2 border-[#0B1330]">
+                                                <td className="p-5 text-right font-inter font-bold uppercase tracking-widest text-xs">Total Volume</td>
+                                                <td className="p-5 font-plex font-bold text-2xl">{selectedMonthData.total}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                )}
+                            </div>
+                        </div>
+                        <div className="bg-[#F6F1E4] rounded-xl shadow-sm border border-[#C8A24D]/30 overflow-hidden">
+                            <div className="bg-white p-5 border-b-2 border-[#C8A24D]/20">
+                                <h3 className="text-xl font-cormorant font-bold text-[#0B1330] flex items-center gap-2"><Users size={20} className="text-[#C8A24D]"/> Vanguard Roster (Consistency)</h3>
+                            </div>
+                            <div className="max-h-[400px] overflow-y-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead><tr className="bg-white border-b border-[#C8A24D]/20 text-xs font-inter uppercase tracking-widest text-[#1C1730]/60 font-bold sticky top-0 shadow-sm"><th className="p-5">Identity</th><th className="p-5">Cycles</th></tr></thead>
+                                    <tbody className="divide-y divide-[#C8A24D]/10 bg-[#F6F1E4]">
+                                        {memberStats.length === 0 ? (<tr><td colSpan={2} className="p-8 text-center text-[#1C1730]/50 font-plex italic">No data acquired.</td></tr>) : (
+                                            memberStats.map((member, idx) => (
+                                                <tr key={idx} className="hover:bg-[#C8A24D]/5">
+                                                    <td className="p-5 font-bold font-inter text-[#1C1730] flex items-center gap-2">{idx < 3 && <span className="text-[#C8A24D]">◆</span>}{member.name}</td>
+                                                    <td className="p-5 font-plex font-bold text-[#0B1330]">{member.count}</td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </>
+            )}
+
+            {/* TAB: CELL GROUPS */}
+            {analyticsTab === 'cells' && (
+                <>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                        <div className="bg-[#F6F1E4] p-6 rounded-xl border border-[#C8A24D]/30 shadow-sm flex items-center gap-5 border-l-4 border-l-[#0B1330]">
+                            <div className="bg-[#0B1330] p-4 rounded text-[#C8A24D]"><Users size={28}/></div>
+                            <div><p className="text-[10px] text-[#1C1730]/60 font-bold font-inter uppercase tracking-widest">Mean Sector Size</p><p className="text-4xl font-plex font-bold text-[#0B1330]">{cellStats.overallAvg}</p></div>
+                        </div>
+                        <div className="bg-[#F6F1E4] p-6 rounded-xl border border-[#C8A24D]/30 shadow-sm flex items-center gap-5 border-l-4 border-l-[#C8A24D]">
+                            <div className="bg-[#C8A24D] p-4 rounded text-[#0B1330] font-bold text-2xl font-plex">◆</div>
+                            <div className="overflow-hidden"><p className="text-[10px] text-[#1C1730]/60 font-bold font-inter uppercase tracking-widest">Prime Sector</p><p className="text-xl font-cormorant font-bold text-[#0B1330] truncate">{cellStats.bestCell}</p></div>
+                        </div>
+                        <div className="bg-[#F6F1E4] p-6 rounded-xl border border-[#C8A24D]/30 shadow-sm flex items-center gap-5 border-l-4 border-l-[#0B1330]">
+                            <div className="bg-[#0B1330] p-4 rounded text-[#C8A24D]"><Activity size={28}/></div>
+                            <div className="overflow-hidden"><p className="text-[10px] text-[#1C1730]/60 font-bold font-inter uppercase tracking-widest">Max Velocity</p><p className="text-xl font-cormorant font-bold text-[#0B1330] truncate">{cellStats.fastestGrowing}</p></div>
+                        </div>
+                    </div>
+                    
+                    <div className="bg-[#F6F1E4] rounded-xl shadow-sm border border-[#C8A24D]/30 overflow-hidden">
+                        <div className="bg-[#0B1330] p-5 border-b border-[#C8A24D]/40">
+                            <h3 className="text-xl font-cormorant font-bold text-[#C8A24D] flex items-center gap-2"><Home size={20}/> Sector Matrix</h3>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-white border-b border-[#C8A24D]/20 text-xs font-inter uppercase tracking-widest text-[#1C1730]/60 font-bold">
+                                        <th className="p-5">Sector Designation</th>
+                                        <th className="p-5">Mean Yield</th>
+                                        <th className="p-5">Cycles</th>
+                                        <th className="p-5">Velocity (Growth)</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-[#C8A24D]/10 bg-[#F6F1E4]">
+                                    {cellStats.cellsArray.length === 0 ? (<tr><td colSpan={4} className="p-8 text-center text-[#1C1730]/50 font-plex italic">No sectors registered.</td></tr>) : (
+                                        cellStats.cellsArray.map((cell: any, idx: number) => (
+                                            <tr key={idx} className="hover:bg-[#C8A24D]/5 transition-colors">
+                                                <td className="p-5 font-bold font-inter text-[#1C1730]">{cell.name}</td>
+                                                <td className="p-5 font-plex font-bold text-[#0B1330] text-lg">{cell.avg}</td>
+                                                <td className="p-5 font-plex text-[#1C1730]/70">{cell.count}</td>
+                                                <td className="p-5 font-plex font-bold">
+                                                    {cell.growth > 0 ? <span className="text-[#0B1330] flex items-center gap-1">+{cell.growth} <TrendingUp size={14} className="text-[#C8A24D]"/></span> : 
+                                                     cell.growth < 0 ? <span className="text-[#6E1E2B]">{cell.growth}</span> : 
+                                                     <span className="text-[#1C1730]/40">Static</span>}
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </>
+            )}
+          </div>
+        )}
+
+        {/* --- 🔥 REGISTRATION FORM 🔥 --- */}
+        {activeView === 'members' && (
+          <div className="max-w-4xl mx-auto bg-[#F6F1E4] p-8 rounded-xl shadow-xl border border-[#C8A24D]/30 relative z-10">
+            <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] mb-6 transition-colors"><ArrowLeft size={16} /> Retreat to Dashboard</button>
+            <h2 className="text-3xl font-cormorant font-bold text-[#0B1330] mb-8 border-b-2 border-[#C8A24D]/20 pb-4">Entity Registration</h2>
+            
+            <form onSubmit={handleSaveMember} className="flex flex-col gap-6 max-w-lg">
+              <div className="bg-white p-5 rounded-lg border border-[#C8A24D]/40 shadow-sm border-l-4 border-l-[#C8A24D]">
+                <label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Clearance Profile (Status)</label>
+                <select value={memberStatus} onChange={(e) => setMemberStatus(e.target.value)} className="w-full border border-[#C8A24D]/30 rounded p-3 bg-[#F6F1E4] text-[#0B1330] font-bold font-inter outline-none focus:border-[#C8A24D] focus:ring-1 focus:ring-[#C8A24D]">
+                  <option value="1st Timer">1st Timer</option>
+                  <option value="2nd Timer">2nd Timer</option>
+                  <option value="Student">Student Demographic</option>
+                  <option value="Regular">Regular Member</option>
+                </select>
+              </div>
+
+              <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Full Identity</label><input type="text" required value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div>
+              
+              <div className="grid grid-cols-2 gap-6">
+                <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Gender</label><select value={gender} onChange={(e) => setGender(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]"><option value="">Select...</option><option value="Male">Male</option><option value="Female">Female</option></select></div>
+                <div>
+                  <label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Guarded Genesis (DOB)</label>
+                  <div className="flex gap-2">
+                    <select value={dobMonth} onChange={(e) => setDobMonth(e.target.value)} className="w-1/2 bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]"><option value="">Mo</option>{['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map(m => <option key={m} value={m}>{m.substring(0,3)}</option>)}</select>
+                    <select value={dobDay} onChange={(e) => setDobDay(e.target.value)} className="w-1/2 bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]"><option value="">Day</option>{[...Array(31)].map((_, i) => <option key={i+1} value={i+1}>{i+1}</option>)}</select>
+                  </div>
+                </div>
+              </div>
+
+              <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Vocation</label><input type="text" value={occupation} onChange={(e) => setOccupation(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div>
+              <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Comms Vector (Phone)</label><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-plex outline-none focus:border-[#C8A24D]" /></div>
+              
+              <button type="submit" disabled={isSubmitting} className="bg-[#0B1330] text-[#C8A24D] px-4 py-4 rounded font-bold font-inter uppercase tracking-widest hover:bg-[#2F1B4D] shadow-lg transition-colors border border-[#0B1330] mt-4 disabled:opacity-50">
+                Commit to Ledger
+              </button>
+              
+              {statusMessage && <div className={`p-4 rounded border font-inter font-bold text-sm ${statusMessage.includes('✅') ? 'bg-[#C8A24D]/10 text-[#0B1330] border-[#C8A24D]' : 'bg-[#6E1E2B]/10 text-[#6E1E2B] border-[#6E1E2B]'}`}>{statusMessage}</div>}
+            </form>
+          </div>
+        )}
+
+        {/* --- 🔥 DYNAMIC MEMBER CHECK-IN 🔥 --- */}
+        {activeView === 'attendance' && (
+          <div className="max-w-4xl mx-auto bg-[#F6F1E4] p-8 rounded-xl shadow-xl border border-[#C8A24D]/30 relative z-10">
+            <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] mb-6 transition-colors"><ArrowLeft size={16} /> Retreat to Dashboard</button>
+            <div className="flex items-center gap-3 mb-8 border-b-2 border-[#C8A24D]/20 pb-4"><CheckSquare className="text-[#C8A24D]" size={32} /><h2 className="text-3xl font-cormorant font-bold text-[#0B1330]">Service Registry</h2></div>
+            
+            <div className="flex flex-col md:flex-row gap-6 mb-8">
+              <div className="flex-1"><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Temporal Index (Date)</label><input type="date" value={checkinDate} onChange={(e) => setCheckinDate(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div>
+              <div className="flex-[2]">
+                <label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Database Query</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><Search size={18} className="text-[#C8A24D]" /></div>
+                  <input type="text" placeholder="Query by Identity or Vector (Phone)..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 pl-12 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" />
+                </div>
+              </div>
+            </div>
+            
+            <div className="border border-[#C8A24D]/40 rounded-lg overflow-hidden mb-6 shadow-sm bg-white">
+              <div className="bg-[#0B1330] p-4 font-bold text-[#F6F1E4] text-sm flex justify-between font-inter uppercase tracking-widest">
+                  <span>Congregation Roster</span><span className="text-[#C8A24D] font-plex">{selectedMembers.length} Flagged</span>
+              </div>
+              <div className="max-h-[50vh] overflow-y-auto p-2 bg-[#F6F1E4]">
+                {memberList.filter(m => m.full_name.toLowerCase().includes(searchTerm.toLowerCase()) || (m.phone_number && m.phone_number.includes(searchTerm))).map((m, idx) => (
+                  <label key={m.id || idx} className="flex items-start gap-4 p-4 hover:bg-white rounded cursor-pointer border-b border-[#C8A24D]/10 last:border-0 transition-colors">
+                    <input type="checkbox" checked={selectedMembers.includes(m.id)} onChange={() => toggleMemberSelection(m.id)} className="w-6 h-6 mt-0.5 text-[#0B1330] rounded border-[#C8A24D]/40 focus:ring-[#C8A24D]" />
+                    <div className="flex flex-col">
+                        <span className="text-[#1C1730] font-bold font-inter text-lg">{m.full_name}</span>
+                        <span className="text-[#1C1730]/50 text-sm font-plex">{m.phone_number || 'No vector on file'}</span>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+            
+            <button onClick={handleSaveCheckins} disabled={isSubmitting || memberList.length === 0} className="w-full md:w-auto bg-[#C8A24D] text-[#0B1330] px-10 py-4 rounded font-bold font-inter uppercase tracking-widest text-lg disabled:opacity-50 shadow-lg hover:bg-[#b59040] transition-colors">
+                {isSubmitting ? 'Verifying...' : 'Commit Registry'}
+            </button>
+            
+            {checkinStatusMessage && (
+                <div className={`p-4 rounded mt-6 text-sm font-bold font-inter border ${checkinStatusMessage.includes('✅') ? 'bg-[#C8A24D]/10 text-[#0B1330] border-[#C8A24D]' : checkinStatusMessage.includes('⚠️') ? 'bg-white text-[#0B1330] border-[#0B1330]' : 'bg-[#6E1E2B]/10 text-[#6E1E2B] border-[#6E1E2B]'}`}>
+                    {checkinStatusMessage}
+                </div>
+            )}
+          </div>
+        )}
+
+        {/* --- 🔥 CELL LOG 🔥 --- */}
+        {activeView === 'cell_log' && (
+          <div className="max-w-4xl mx-auto bg-[#F6F1E4] p-8 rounded-xl shadow-xl border border-[#C8A24D]/30 relative z-10">
+            <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] mb-6 transition-colors"><ArrowLeft size={16} /> Retreat to Dashboard</button>
+            <div className="flex items-center gap-3 mb-8 border-b-2 border-[#C8A24D]/20 pb-4"><Home className="text-[#C8A24D]" size={32} /><h2 className="text-3xl font-cormorant font-bold text-[#0B1330]">Sector Report (Cells)</h2></div>
+            
+            <form onSubmit={handleSaveCellMeeting} className="flex flex-col gap-6 max-w-lg">
+              <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Sector Designation</label><input type="text" required value={cellName} onChange={(e) => setCellName(e.target.value)} placeholder="e.g. Grace Fellowship - Downtown" className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div>
+              <div className="grid grid-cols-2 gap-6">
+                  <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Overseer Identity</label><input type="text" required value={cellLeader} onChange={(e) => setCellLeader(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div>
+                  <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Total Volume</label><input type="number" required min="1" value={cellAttendance} onChange={(e) => setCellAttendance(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-plex outline-none focus:border-[#C8A24D]" /></div>
+              </div>
+              <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Temporal Index</label><input type="date" required value={cellDate} onChange={(e) => setCellDate(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div>
+              <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Operational Notes</label><textarea rows={4} value={cellNotes} onChange={(e) => setCellNotes(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div>
+              <button type="submit" disabled={isSubmitting} className="bg-[#0B1330] text-[#C8A24D] px-4 py-4 rounded font-bold font-inter uppercase tracking-widest hover:bg-[#2F1B4D] shadow-lg transition-colors border border-[#0B1330] mt-4 disabled:opacity-50">Commit Report</button>
+              {cellStatusMessage && <div className={`p-4 rounded border font-inter font-bold text-sm ${cellStatusMessage.includes('✅') ? 'bg-[#C8A24D]/10 text-[#0B1330] border-[#C8A24D]' : 'bg-[#6E1E2B]/10 text-[#6E1E2B] border-[#6E1E2B]'}`}>{cellStatusMessage}</div>}
+            </form>
+          </div>
+        )}
+
+        {/* --- 🔥 RADAR TRIAGE (ABSENTEES) 🔥 --- */}
+        {activeView === 'absentees' && isAdmin && (
+          <div className="max-w-6xl mx-auto space-y-6 relative z-10">
+            <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] transition-colors"><ArrowLeft size={16} /> Retreat to Dashboard</button>
+            <div className="bg-[#F6F1E4] rounded-xl shadow-xl border border-[#C8A24D]/30 overflow-hidden">
+                <div className="bg-[#0B1330] p-6 border-b-2 border-[#C8A24D]">
+                    <h3 className="text-2xl font-cormorant font-bold text-[#F6F1E4] flex items-center gap-3"><UserMinus className="text-[#6E1E2B]"/> Radar Triage Protocol</h3>
+                </div>
+                <div className="p-0">
+                    <table className="w-full text-left border-collapse">
+                        <thead><tr className="bg-white border-b border-[#C8A24D]/20 text-xs font-inter uppercase tracking-widest text-[#1C1730]/60 font-bold"><th className="p-5">Identity</th><th className="p-5">Threat Level</th><th className="p-5">Cycles Missed</th><th className="p-5">Action</th></tr></thead>
+                        <tbody className="divide-y divide-[#C8A24D]/10 bg-[#F6F1E4]">
+                            {absenteeList.map((person, idx) => (
+                                <tr key={idx} className="hover:bg-white transition-colors">
+                                    <td className="p-5 font-bold text-[#1C1730] font-inter text-lg">{person.full_name}</td>
+                                    <td className="p-5"><span className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest border rounded ${person.colorClass}`}>{person.alertLevel}</span></td>
+                                    <td className="p-5 font-plex font-bold text-[#0B1330] text-lg">{person.missedCount}</td>
+                                    <td className="p-5"><button onClick={() => handleSendMessage(person.phone_number, person.full_name, 'whatsapp', 'checking_in')} className="bg-[#0B1330] text-[#C8A24D] px-4 py-2 rounded font-bold font-inter text-xs tracking-wide hover:bg-[#2F1B4D] shadow">DISPATCH</button></td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- 🔥 BIRTHDAY DASHBOARD 🔥 --- */}
+        {activeView === 'birthdays' && isAdmin && (
+          <div className="max-w-4xl mx-auto space-y-6 relative z-10">
+            <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] transition-colors"><ArrowLeft size={16} /> Retreat to Dashboard</button>
+            <div className="bg-[#F6F1E4] rounded-xl shadow-xl border border-[#C8A24D]/30 overflow-hidden">
+                <div className="bg-[#0B1330] p-6 border-b-2 border-[#C8A24D]">
+                    <h3 className="text-2xl font-cormorant font-bold text-[#F6F1E4] flex items-center gap-3"><Gift className="text-[#C8A24D]"/> Temporal Milestones (Birthdays)</h3>
+                </div>
+                <div className="p-4 bg-white/50 border-b border-[#C8A24D]/20">
+                    <h4 className="font-bold text-[#1C1730] font-inter tracking-widest uppercase text-xs">Immediate Requirements (Today)</h4>
+                </div>
+                <div className="bg-[#F6F1E4]">
+                    {birthdaysToday.length === 0 ? <div className="p-6 text-center font-plex text-[#1C1730]/50 italic">None logged.</div> : birthdaysToday.map((p, idx) => <BirthdayRow key={idx} person={p} />)}
+                </div>
+                
+                <div className="p-4 bg-white/50 border-b border-[#C8A24D]/20 border-t border-[#C8A24D]/40">
+                    <h4 className="font-bold text-[#1C1730] font-inter tracking-widest uppercase text-xs">Upcoming Requirements (7 Days)</h4>
+                </div>
+                <div className="bg-[#F6F1E4]">
+                    {birthdaysWeek.length === 0 ? <div className="p-6 text-center font-plex text-[#1C1730]/50 italic">None logged.</div> : birthdaysWeek.map((p, idx) => <BirthdayRow key={idx} person={p} />)}
+                </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- 🔥 GUEST ROSTER 🔥 --- */}
+        {activeView === 'guests' && isAdmin && (
+          <div className="max-w-6xl mx-auto space-y-6 relative z-10">
+            <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] transition-colors"><ArrowLeft size={16} /> Retreat to Dashboard</button>
+            <div className="bg-[#F6F1E4] rounded-xl shadow-xl border border-[#C8A24D]/30 overflow-hidden">
+                <div className="bg-[#0B1330] p-6 border-b-2 border-[#C8A24D]">
+                    <h3 className="text-2xl font-cormorant font-bold text-[#F6F1E4] flex items-center gap-3"><ClipboardList className="text-[#C8A24D]"/> Primary Acquisitions (Guests)</h3>
+                </div>
+                <div className="p-0">
+                    <table className="w-full text-left border-collapse">
+                        <thead><tr className="bg-white border-b border-[#C8A24D]/20 text-xs font-inter uppercase tracking-widest text-[#1C1730]/60 font-bold"><th className="p-5">Identity</th><th className="p-5">Clearance</th><th className="p-5">Vector</th></tr></thead>
+                        <tbody className="divide-y divide-[#C8A24D]/10 bg-[#F6F1E4]">
+                            {guestList.map((g, i) => (
+                                <tr key={i} className="hover:bg-white transition-colors">
+                                    <td className="p-5 font-bold text-[#1C1730] font-inter text-lg">{g.full_name}</td>
+                                    <td className="p-5 font-inter text-sm text-[#0B1330] font-bold">{g.status}</td>
+                                    <td className="p-5 font-plex text-[#1C1730]">{g.phone_number}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
