@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, ArrowLeft, Sparkles, Lock, LogOut, Cake, CheckSquare, Search, UserPlus, ClipboardList, UserMinus, BarChart3, ShieldCheck, MessageCircle, MessageSquare, Heart, Gift, TrendingUp, CalendarDays, Share2, FileText, Home, Activity } from 'lucide-react';
+import { Users, ArrowLeft, Sparkles, Lock, LogOut, Cake, CheckSquare, Search, UserPlus, ClipboardList, UserMinus, BarChart3, ShieldCheck, MessageCircle, MessageSquare, Phone, Heart, Gift, TrendingUp, CalendarDays, Share2, FileText, Home, Activity } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
 // --- INITIALIZE SUPABASE ---
@@ -89,13 +89,12 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // --- 🔥 SECURITY: HARD LOCK CLEARANCE LOGIC 🔥 ---
+  // --- 🔥 ROLE CLEARANCE LOGIC 🔥 ---
   const userEmail = session?.user?.email?.toLowerCase() || '';
   const isCellLeader = userEmail.includes('cell') || userEmail.includes('leader');
   const isUsher = userEmail.includes('usher') && !isCellLeader;
   const isAdmin = !isUsher && !isCellLeader;
 
-  // If a cell leader logs in, immediately force them into the cell log view.
   useEffect(() => {
     if (session && isCellLeader) {
       setActiveView('cell_log');
@@ -240,9 +239,13 @@ export default function App() {
     window.open(`https://wa.me/?text=${encodeURIComponent(reportText)}`, '_blank');
   };
 
-  const handleSendMessage = (phone: string | null, name: string, type: 'whatsapp' | 'sms', overrideTemplate?: string) => {
+  const handleSendMessage = (phone: string | null, name: string, type: 'whatsapp' | 'sms' | 'call', overrideTemplate?: string) => {
     if (!phone) return alert(`No phone number recorded for ${name}.`);
     const cleanPhone = phone.replace(/\D/g, ''); 
+    if (type === 'call') {
+      window.open(`tel:${cleanPhone}`, '_self');
+      return;
+    }
     const message = TEMPLATES[Math.max(0, Object.keys(TEMPLATES).indexOf(overrideTemplate || template)) ? (overrideTemplate || template) as keyof typeof TEMPLATES : 'welcome'].replace('{name}', name);
     if (type === 'whatsapp') window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`, '_blank');
     else window.open(`sms:${cleanPhone}?body=${encodeURIComponent(message)}`, '_blank');
@@ -354,8 +357,9 @@ export default function App() {
     <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#C8A24D]/10 last:border-0 p-4 hover:bg-[#C8A24D]/5 transition-colors gap-3">
       <div><div className="font-bold text-[#1C1730] text-lg font-inter">{person.full_name}</div><div className="text-[#1C1730]/60 text-sm font-plex">{person.date_of_birth} • {person.phone_number || 'No Phone'}</div></div>
       <div className="flex items-center gap-2 flex-wrap">
-        <button onClick={() => handleSendMessage(person.phone_number, person.full_name, 'whatsapp', 'birthday')} className="flex items-center gap-1 bg-[#0B1330] text-[#F6F1E4] px-3 py-1.5 rounded hover:bg-[#2F1B4D] text-sm font-bold font-inter transition-colors"><MessageCircle size={16}/> WA</button>
-        <button onClick={() => handleSendMessage(person.phone_number, person.full_name, 'sms', 'birthday')} className="flex items-center gap-1 bg-transparent border border-[#0B1330]/30 text-[#0B1330] px-3 py-1.5 rounded hover:bg-[#0B1330]/5 text-sm font-bold font-inter transition-colors"><MessageSquare size={16}/> SMS</button>
+        <button onClick={() => handleSendMessage(person.phone_number, person.full_name, 'whatsapp', 'birthday')} className="flex items-center gap-1 bg-[#0B1330] text-[#F6F1E4] px-3 py-1.5 rounded hover:bg-[#2F1B4D] text-xs font-bold font-inter transition-colors"><MessageCircle size={14}/> WA</button>
+        <button onClick={() => handleSendMessage(person.phone_number, person.full_name, 'sms', 'birthday')} className="flex items-center gap-1 bg-transparent border border-[#0B1330]/30 text-[#0B1330] px-3 py-1.5 rounded hover:bg-[#0B1330]/5 text-xs font-bold font-inter transition-colors"><MessageSquare size={14}/> SMS</button>
+        <button onClick={() => handleSendMessage(person.phone_number, person.full_name, 'call')} className="flex items-center gap-1 bg-[#C8A24D] text-[#0B1330] px-3 py-1.5 rounded hover:bg-[#b59040] text-xs font-bold font-inter transition-colors"><Phone size={14}/> Call</button>
       </div>
     </div>
   );
@@ -377,6 +381,7 @@ export default function App() {
         
         <div className="bg-[#F6F1E4] p-10 rounded-2xl shadow-2xl max-w-md w-full border border-[#C8A24D]/30 relative z-10">
           <div className="flex justify-center mb-4"><GraceCrest className="h-28 w-auto" opacity={1} /></div>
+          <h1 className="text-3xl font-cinzel font-bold text-center text-[#0B1330] mb-6 tracking-wide">Grace Citadel</h1>
           <form onSubmit={handleLogin} className="space-y-5">
             <div><label className="block text-sm font-bold text-[#1C1730] mb-1 font-inter">Email</label><input type="email" required value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} className="w-full bg-white border border-[#C8A24D]/40 rounded-md p-3 focus:border-[#C8A24D] focus:ring-1 focus:ring-[#C8A24D] outline-none text-[#1C1730] font-inter" /></div>
             <div><label className="block text-sm font-bold text-[#1C1730] mb-1 font-inter">Password</label><input type="password" required value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} className="w-full bg-white border border-[#C8A24D]/40 rounded-md p-3 focus:border-[#C8A24D] focus:ring-1 focus:ring-[#C8A24D] outline-none text-[#1C1730] font-inter" /></div>
@@ -406,6 +411,9 @@ export default function App() {
       <header className="bg-[#0B1330] border-b-2 border-[#C8A24D] px-6 py-4 flex items-center justify-between shadow-md relative z-20">
         <div className="flex items-center gap-4 cursor-pointer group" onClick={() => !isCellLeader && setActiveView('dashboard')}>
           <GraceCrest className="h-14 w-auto transform group-hover:scale-105 transition-transform" />
+          <div>
+            <h1 className="text-2xl font-cinzel font-bold text-[#C8A24D] tracking-wide leading-none">Grace Citadel</h1>
+          </div>
         </div>
         <div className="flex items-center gap-4">
             <span className="text-[#F6F1E4]/70 font-plex text-xs hidden md:inline">
@@ -433,10 +441,12 @@ export default function App() {
                   <p className="text-[#1C1730]/70 text-sm font-inter">Register new members and 1st timers.</p>
               </div>
 
-              <div className="bg-[#F6F1E4] p-6 rounded-xl shadow-sm border border-[#C8A24D]/20 hover:shadow-md hover:border-[#C8A24D]/50 transition-all cursor-pointer group" onClick={() => {setActiveView('cell_log'); setCellStatusMessage('');}}>
-                  <h2 className="text-2xl font-cormorant font-bold mb-2 text-[#0B1330] flex items-center gap-3"><Home size={22} className="text-[#C8A24D]"/> Cell Meeting Log</h2>
-                  <p className="text-[#1C1730]/70 text-sm font-inter">Record weekly mid-week fellowship data.</p>
-              </div>
+              {isAdmin && (
+                <div className="bg-[#F6F1E4] p-6 rounded-xl shadow-sm border border-[#C8A24D]/20 hover:shadow-md hover:border-[#C8A24D]/50 transition-all cursor-pointer group" onClick={() => {setActiveView('cell_log'); setCellStatusMessage('');}}>
+                    <h2 className="text-2xl font-cormorant font-bold mb-2 text-[#0B1330] flex items-center gap-3"><Home size={22} className="text-[#C8A24D]"/> Cell Meeting Log</h2>
+                    <p className="text-[#1C1730]/70 text-sm font-inter">Record weekly mid-week fellowship data.</p>
+                </div>
+              )}
 
               {isAdmin && (
                 <>
@@ -494,10 +504,12 @@ export default function App() {
                         <div className="bg-[#F6F1E4] border border-[#C8A24D]/30 rounded-xl p-6 shadow-sm">
                             <h3 className="text-2xl font-cormorant font-bold text-[#0B1330] mb-4 flex items-center gap-2"><Gift size={22} className="text-[#C8A24D]"/> Today's Birthdays</h3>
                             {birthdaysToday.length === 0 ? <p className="text-[#1C1730]/50 text-sm font-inter font-bold italic">No birthdays today.</p> : birthdaysToday.map((p, i) => (
-                                <div key={i} className="bg-white p-4 rounded-lg border border-[#C8A24D]/20 flex justify-between items-center mb-3 shadow-sm">
+                                <div key={i} className="bg-white p-4 rounded-lg border border-[#C8A24D]/20 flex justify-between items-center mb-3 shadow-sm flex-wrap gap-2">
                                     <span className="font-bold text-[#1C1730] font-inter text-lg">{p.full_name}</span>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => handleSendMessage(p.phone_number, p.full_name, 'whatsapp', 'birthday')} className="text-xs font-bold font-inter bg-[#0B1330] text-[#F6F1E4] px-3 py-2 rounded hover:bg-[#2F1B4D] transition-colors shadow">WhatsApp</button>
+                                    <div className="flex gap-1.5">
+                                        <button onClick={() => handleSendMessage(p.phone_number, p.full_name, 'whatsapp', 'birthday')} className="text-xs font-bold font-inter bg-[#0B1330] text-[#F6F1E4] px-2.5 py-1.5 rounded hover:bg-[#2F1B4D] transition-colors shadow">WA</button>
+                                        <button onClick={() => handleSendMessage(p.phone_number, p.full_name, 'sms', 'birthday')} className="text-xs font-bold font-inter bg-transparent border border-[#0B1330]/30 text-[#0B1330] px-2.5 py-1.5 rounded hover:bg-[#0B1330]/5 transition-colors shadow">SMS</button>
+                                        <button onClick={() => handleSendMessage(p.phone_number, p.full_name, 'call')} className="text-xs font-bold font-inter bg-[#C8A24D] text-[#0B1330] px-2.5 py-1.5 rounded hover:bg-[#b59040] transition-colors shadow">Call</button>
                                     </div>
                                 </div>
                             ))}
@@ -505,12 +517,16 @@ export default function App() {
                         <div className="bg-[#F6F1E4] border border-[#C8A24D]/30 rounded-xl p-6 shadow-sm">
                             <h3 className="text-2xl font-cormorant font-bold text-[#0B1330] mb-4 flex items-center gap-2"><Sparkles size={22} className="text-[#C8A24D]"/> New Guests Follow-Up</h3>
                             {guestTasks.length === 0 ? <p className="text-[#1C1730]/50 text-sm font-inter font-bold italic">Queue cleared.</p> : guestTasks.map((t, i) => (
-                                <div key={i} className="bg-white p-4 rounded-lg border border-[#C8A24D]/20 flex justify-between items-center mb-3 shadow-sm">
+                                <div key={i} className="bg-white p-4 rounded-lg border border-[#C8A24D]/20 flex justify-between items-center mb-3 shadow-sm flex-wrap gap-2">
                                     <div>
                                         <span className="font-bold text-[#1C1730] font-inter text-lg">{t.member.full_name}</span>
                                         <p className="text-xs text-[#1C1730]/60 font-plex mt-1">{t.type}</p>
                                     </div>
-                                    <button onClick={() => handleSendMessage(t.member.phone_number, t.member.full_name, 'whatsapp', t.msgTemplate)} className="bg-[#0B1330] text-[#C8A24D] p-3 rounded hover:bg-[#2F1B4D] transition-colors shadow"><MessageCircle size={18}/></button>
+                                    <div className="flex gap-1.5">
+                                        <button onClick={() => handleSendMessage(t.member.phone_number, t.member.full_name, 'whatsapp', t.msgTemplate)} className="bg-[#0B1330] text-[#F6F1E4] p-2 rounded hover:bg-[#2F1B4D] transition-colors shadow"><MessageCircle size={14}/></button>
+                                        <button onClick={() => handleSendMessage(t.member.phone_number, t.member.full_name, 'sms', t.msgTemplate)} className="bg-transparent border border-[#0B1330]/30 text-[#0B1330] p-2 rounded hover:bg-[#0B1330]/5 transition-colors shadow"><MessageSquare size={14}/></button>
+                                        <button onClick={() => handleSendMessage(t.member.phone_number, t.member.full_name, 'call')} className="bg-[#C8A24D] text-[#0B1330] p-2 rounded hover:bg-[#b59040] transition-colors shadow"><Phone size={14}/></button>
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -520,12 +536,16 @@ export default function App() {
                             <div className="absolute top-0 left-0 w-1 h-full bg-[#6E1E2B]"></div>
                             <h3 className="text-2xl font-cormorant font-bold text-[#6E1E2B] mb-4 flex items-center gap-2"><UserMinus size={22}/> Urgent: Missing Members</h3>
                             {urgentMissingTasks.length === 0 ? <p className="text-[#1C1730]/50 text-sm font-inter font-bold italic">No critical absences detected.</p> : urgentMissingTasks.map((t, i) => (
-                                <div key={i} className="bg-white p-4 rounded-lg border border-[#6E1E2B]/20 flex justify-between items-center mb-3 shadow-sm">
+                                <div key={i} className="bg-white p-4 rounded-lg border border-[#6E1E2B]/20 flex justify-between items-center mb-3 shadow-sm flex-wrap gap-2">
                                     <div>
                                         <span className="font-bold text-[#1C1730] font-inter text-lg">{t.member.full_name}</span>
                                         <p className="text-xs text-[#6E1E2B] font-inter font-bold mt-1">{t.description}</p>
                                     </div>
-                                    <button onClick={() => handleSendMessage(t.member.phone_number, t.member.full_name, 'whatsapp', t.msgTemplate)} className="bg-[#6E1E2B] text-[#F6F1E4] p-3 rounded hover:bg-[#0B1330] transition-colors shadow"><MessageCircle size={18}/></button>
+                                    <div className="flex gap-1.5">
+                                        <button onClick={() => handleSendMessage(t.member.phone_number, t.member.full_name, 'whatsapp', t.msgTemplate)} className="bg-[#6E1E2B] text-[#F6F1E4] p-2 rounded hover:bg-[#0B1330] transition-colors shadow"><MessageCircle size={14}/></button>
+                                        <button onClick={() => handleSendMessage(t.member.phone_number, t.member.full_name, 'sms', t.msgTemplate)} className="bg-transparent border border-[#6E1E2B]/30 text-[#6E1E2B] p-2 rounded hover:bg-[#6E1E2B]/5 transition-colors shadow"><MessageSquare size={14}/></button>
+                                        <button onClick={() => handleSendMessage(t.member.phone_number, t.member.full_name, 'call')} className="bg-[#C8A24D] text-[#0B1330] p-2 rounded hover:bg-[#b59040] transition-colors shadow"><Phone size={14}/></button>
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -753,16 +773,22 @@ export default function App() {
                 <div className="bg-[#0B1330] p-6 border-b-2 border-[#C8A24D]">
                     <h3 className="text-2xl font-cormorant font-bold text-[#F6F1E4] flex items-center gap-3"><UserMinus className="text-[#6E1E2B]"/> Smart Absentee Radar Triage</h3>
                 </div>
-                <div className="p-0">
-                    <table className="w-full text-left border-collapse">
-                        <thead><tr className="bg-white border-b border-[#C8A24D]/20 text-xs font-inter uppercase tracking-widest text-[#1C1730]/60 font-bold"><th className="p-5">Member</th><th className="p-5">Triage Status</th><th className="p-5">Missed Count</th><th className="p-5">Action</th></tr></thead>
+                <div className="p-0 overflow-x-auto">
+                    <table className="w-full text-left border-collapse min-w-[600px]">
+                        <thead><tr className="bg-white border-b border-[#C8A24D]/20 text-xs font-inter uppercase tracking-widest text-[#1C1730]/60 font-bold"><th className="p-5">Member</th><th className="p-5">Triage Status</th><th className="p-5">Missed Count</th><th className="p-5">Instant Vectors</th></tr></thead>
                         <tbody className="divide-y divide-[#C8A24D]/10 bg-[#F6F1E4]">
                             {absenteeList.map((person, idx) => (
                                 <tr key={idx} className="hover:bg-white transition-colors">
                                     <td className="p-5 font-bold text-[#1C1730] font-inter text-lg">{person.full_name}</td>
                                     <td className="p-5"><span className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest border rounded ${person.colorClass}`}>{person.alertLevel}</span></td>
                                     <td className="p-5 font-plex font-bold text-[#0B1330] text-lg">{person.missedCount}</td>
-                                    <td className="p-5"><button onClick={() => handleSendMessage(person.phone_number, person.full_name, 'whatsapp', 'checking_in')} className="bg-[#0B1330] text-[#C8A24D] px-4 py-2 rounded font-bold font-inter text-xs tracking-wide hover:bg-[#2F1B4D] shadow">Message</button></td>
+                                    <td className="p-5">
+                                        <div className="flex gap-2">
+                                            <button onClick={() => handleSendMessage(person.phone_number, person.full_name, 'whatsapp', 'checking_in')} className="bg-[#0B1330] text-[#F6F1E4] px-3 py-2 rounded font-bold font-inter text-xs tracking-wide hover:bg-[#2F1B4D] shadow flex items-center gap-1"><MessageCircle size={14}/> WA</button>
+                                            <button onClick={() => handleSendMessage(person.phone_number, person.full_name, 'sms', 'checking_in')} className="bg-transparent border border-[#0B1330]/30 text-[#0B1330] px-3 py-2 rounded font-bold font-inter text-xs tracking-wide hover:bg-[#0B1330]/5 shadow flex items-center gap-1"><MessageSquare size={14}/> SMS</button>
+                                            <button onClick={() => handleSendMessage(person.phone_number, person.full_name, 'call')} className="bg-[#C8A24D] text-[#0B1330] px-3 py-2 rounded font-bold font-inter text-xs tracking-wide hover:bg-[#b59040] shadow flex items-center gap-1"><Phone size={14}/> Call</button>
+                                        </div>
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>
@@ -777,7 +803,7 @@ export default function App() {
             <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] transition-colors"><ArrowLeft size={16} /> Back to Dashboard</button>
             <div className="bg-[#F6F1E4] rounded-xl shadow-xl border border-[#C8A24D]/30 overflow-hidden">
                 <div className="bg-[#0B1330] p-6 border-b-2 border-[#C8A24D]">
-                    <h3 className="text-2xl font-cormorant font-bold text-[#F6F1E4] flex items-center gap-3"><Gift className="text-[#C8A24D]"/> Birthday Management</h3>
+                    <h3 className="text-2xl font-cormorant font-bold text-[#F6F1E4] flex items-center gap-3"><Gift className="text-[#C8A24D]"/> Birthday Dashboard</h3>
                 </div>
                 <div className="p-4 bg-white/50 border-b border-[#C8A24D]/20">
                     <h4 className="font-bold text-[#1C1730] font-inter tracking-widest uppercase text-xs">Today's Birthdays</h4>
@@ -803,15 +829,22 @@ export default function App() {
                 <div className="bg-[#0B1330] p-6 border-b-2 border-[#C8A24D]">
                     <h3 className="text-2xl font-cormorant font-bold text-[#F6F1E4] flex items-center gap-3"><ClipboardList className="text-[#C8A24D]"/> Guest Follow-Up Roster</h3>
                 </div>
-                <div className="p-0">
-                    <table className="w-full text-left border-collapse">
-                        <thead><tr className="bg-white border-b border-[#C8A24D]/20 text-xs font-inter uppercase tracking-widest text-[#1C1730]/60 font-bold"><th className="p-5">Member</th><th className="p-5">Status</th><th className="p-5">Phone</th></tr></thead>
+                <div className="p-0 overflow-x-auto">
+                    <table className="w-full text-left border-collapse min-w-[600px]">
+                        <thead><tr className="bg-white border-b border-[#C8A24D]/20 text-xs font-inter uppercase tracking-widest text-[#1C1730]/60 font-bold"><th className="p-5">Member</th><th className="p-5">Status</th><th className="p-5">Phone</th><th className="p-5">Instant Vectors</th></tr></thead>
                         <tbody className="divide-y divide-[#C8A24D]/10 bg-[#F6F1E4]">
                             {guestList.map((g, i) => (
                                 <tr key={i} className="hover:bg-white transition-colors">
                                     <td className="p-5 font-bold text-[#1C1730] font-inter text-lg">{g.full_name}</td>
                                     <td className="p-5 font-inter text-sm text-[#0B1330] font-bold">{g.status}</td>
-                                    <td className="p-5 font-plex text-[#1C1730]">{g.phone_number}</td>
+                                    <td className="p-5 font-plex text-[#1C1730]">{g.phone_number || 'N/A'}</td>
+                                    <td className="p-5">
+                                        <div className="flex gap-2">
+                                            <button onClick={() => handleSendMessage(g.phone_number, g.full_name, 'whatsapp', 'welcome')} className="bg-[#0B1330] text-[#F6F1E4] px-3 py-2 rounded font-bold font-inter text-xs tracking-wide hover:bg-[#2F1B4D] shadow flex items-center gap-1"><MessageCircle size={14}/> WA</button>
+                                            <button onClick={() => handleSendMessage(g.phone_number, g.full_name, 'sms', 'welcome')} className="bg-transparent border border-[#0B1330]/30 text-[#0B1330] px-3 py-2 rounded font-bold font-inter text-xs tracking-wide hover:bg-[#0B1330]/5 shadow flex items-center gap-1"><MessageSquare size={14}/> SMS</button>
+                                            <button onClick={() => handleSendMessage(g.phone_number, g.full_name, 'call')} className="bg-[#C8A24D] text-[#0B1330] px-3 py-2 rounded font-bold font-inter text-xs tracking-wide hover:bg-[#b59040] shadow flex items-center gap-1"><Phone size={14}/> Call</button>
+                                        </div>
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>
