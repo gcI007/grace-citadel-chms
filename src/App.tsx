@@ -7,18 +7,14 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// --- DESIGN SYSTEM: SIGNATURE CREST ---
+// --- DESIGN SYSTEM: OFFICIAL LOGO ---
 const GraceCrest = ({ className = "w-8 h-8", opacity = 1 }) => (
-  <svg className={className} viewBox="0 0 100 100" style={{ opacity }}>
-    {/* Sacred Geometry: Interlocking Rings */}
-    <circle cx="50" cy="50" r="46" fill="none" stroke="#C8A24D" strokeWidth="1.5" />
-    <circle cx="50" cy="30" r="24" fill="none" stroke="#C8A24D" strokeWidth="0.75" opacity="0.4"/>
-    <circle cx="50" cy="70" r="24" fill="none" stroke="#C8A24D" strokeWidth="0.75" opacity="0.4"/>
-    <circle cx="30" cy="50" r="24" fill="none" stroke="#C8A24D" strokeWidth="0.75" opacity="0.4"/>
-    <circle cx="70" cy="50" r="24" fill="none" stroke="#C8A24D" strokeWidth="0.75" opacity="0.4"/>
-    {/* Central Monogram */}
-    <text x="50" y="58" fontFamily="'Cinzel', serif" fontSize="28" fontWeight="bold" fill="#C8A24D" textAnchor="middle" letterSpacing="2">GC</text>
-  </svg>
+  <img 
+    src="/logo.png" 
+    alt="Grace Citadel Int'l Logo" 
+    className={`object-contain ${className}`} 
+    style={{ opacity }} 
+  />
 );
 
 // --- MESSAGE TEMPLATES ---
@@ -32,41 +28,34 @@ const TEMPLATES = {
 };
 
 export default function App() {
-  // --- AUTHENTICATION STATE ---
   const [session, setSession] = useState<any>(null);
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [authError, setAuthError] = useState('');
 
-  // --- APP STATE ---
   const [activeView, setActiveView] = useState('dashboard');
   const [template, setTemplate] = useState('welcome');
   const [analyticsTab, setAnalyticsTab] = useState('service'); 
 
-  // --- BIRTHDAY STATES ---
   const [birthdaysToday, setBirthdaysToday] = useState<any[]>([]);
   const [birthdaysWeek, setBirthdaysWeek] = useState<any[]>([]);
   const [birthdaysMonth, setBirthdaysMonth] = useState<any[]>([]);
 
-  // --- CRM & ROSTER STATES ---
   const [guestList, setGuestList] = useState<any[]>([]);
   const [absenteeList, setAbsenteeList] = useState<any[]>([]);
   const [crmTasks, setCrmTasks] = useState<any[]>([]);
 
-  // --- BULK MESSAGE QUEUE STATES ---
   const [bulkGroup, setBulkGroup] = useState('Student');
   const [bulkText, setBulkText] = useState(TEMPLATES.bulk_student);
   const [bulkQueue, setBulkQueue] = useState<{ name: string; phone: string }[]>([]);
   const [bulkQueueIndex, setBulkQueueIndex] = useState(0);
 
-  // --- VISUAL ANALYTICS STATES ---
   const [monthlyChartData, setMonthlyChartData] = useState<any[]>([]);
   const [selectedMonthData, setSelectedMonthData] = useState<any | null>(null);
   const [memberStats, setMemberStats] = useState<any[]>([]);
   const [cellStats, setCellStats] = useState({ overallAvg: 0, bestCell: '-', fastestGrowing: '-', trendData: [] as any[], cellsArray: [] as any[] });
 
-  // --- FORM STATES (Registration) ---
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -78,7 +67,6 @@ export default function App() {
   const [statusMessage, setStatusMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // --- FORM STATES (Cell Meeting) ---
   const [cellName, setCellName] = useState('');
   const [cellLeader, setCellLeader] = useState('');
   const [cellDate, setCellDate] = useState(new Date().toISOString().split('T')[0]);
@@ -86,7 +74,6 @@ export default function App() {
   const [cellNotes, setCellNotes] = useState('');
   const [cellStatusMessage, setCellStatusMessage] = useState('');
 
-  // --- AI OUTREACH & CHECK-IN STATES ---
   const [promptContext, setPromptContext] = useState('');
   const [generatedMessage, setGeneratedMessage] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -96,7 +83,6 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [checkinStatusMessage, setCheckinStatusMessage] = useState('');
 
-  // --- 1. THE SECURITY GUARD ---
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setSession(session));
@@ -107,7 +93,6 @@ export default function App() {
   const isUsher = userEmail.includes('usher');
   const isAdmin = !isUsher;
 
-  // --- 2. FETCH DASHBOARD DATA ---
   useEffect(() => {
     if (session && isAdmin) {
         if (activeView === 'dashboard') { fetchBirthdays(); fetchCrmTasks(); }
@@ -123,7 +108,6 @@ export default function App() {
     }
   }, [session, activeView, isAdmin]);
 
-  // --- DATA FETCHING ---
   const fetchBirthdays = async () => {
     const { data } = await supabase.from('members').select('full_name, date_of_birth, phone_number');
     if (data) {
@@ -219,7 +203,6 @@ export default function App() {
       const lastCheckinStr = lastCheckinMap[member.full_name];
       let missedCount = 0; if (lastCheckinStr) missedCount = sortedDates.filter(date => date > lastCheckinStr).length; else missedCount = sortedDates.filter(date => date >= createdDate.toISOString().split('T')[0]).length;
       
-      // Mapped colors to the new disciplined palette
       if (member.status === '1st Timer' && daysSinceCreated >= 1 && daysSinceCreated <= 3) newTasks.push({ priority: 1, type: 'Day 2 Follow-Up', color: 'bg-[#0B1330]/10 text-[#0B1330]', member, description: 'New guest! Send a warm welcome message.', msgTemplate: 'welcome' });
       else if (member.status === '1st Timer' && missedCount >= 1 && daysSinceCreated >= 7) newTasks.push({ priority: 2, type: 'Guest Check-In', color: 'bg-[#C8A24D]/10 text-[#C8A24D]', member, description: 'Did not return for week 2.', msgTemplate: 'missed' });
       
@@ -256,7 +239,6 @@ export default function App() {
     else window.open(`sms:${cleanPhone}?body=${encodeURIComponent(message)}`, '_blank');
   };
 
-  // --- WHATSAPP BULK QUEUE LOGIC ---
   const prepareBulkQueue = async () => {
     setIsSubmitting(true);
     const { data: targets } = await supabase.from('members').select('full_name, phone_number, gender, status, occupation');
@@ -298,7 +280,6 @@ export default function App() {
     setIsSubmitting(false);
   };
 
-  // --- FORM SUBMISSIONS ---
   const handleLogin = async (e: React.FormEvent) => { e.preventDefault(); setIsAuthenticating(true); setAuthError(''); const { error } = await supabase.auth.signInWithPassword({ email: loginEmail, password: loginPassword }); if (error) setAuthError(error.message); setIsAuthenticating(false); };
   const handleLogout = async () => { await supabase.auth.signOut(); setActiveView('dashboard'); };
 
@@ -331,15 +312,24 @@ export default function App() {
     try {
       const selectedObjects = memberList.filter(m => selectedMembers.includes(m.id));
       const namesToInsert = selectedObjects.map(m => m.full_name);
-      const { data: existingCheckins } = await supabase.from('member_checkins').select('member_name').eq('service_date', checkinDate).in('member_name', namesToInsert);
+      
+      const { data: existingCheckins, error: checkError } = await supabase.from('member_checkins').select('member_name').eq('service_date', checkinDate).in('member_name', namesToInsert);
+      
+      if (checkError) throw checkError;
+
       const alreadyCheckedIn = new Set(existingCheckins?.map(c => c.member_name) || []);
       const validObjects = selectedObjects.filter(m => !alreadyCheckedIn.has(m.full_name));
+      
       if (validObjects.length === 0) { setCheckinStatusMessage('⚠️ Alert: Everyone selected is already checked in.'); setIsSubmitting(false); return; }
+      
       const recordsToInsert = validObjects.map(m => ({ service_date: checkinDate, member_name: m.full_name }));
       const { error: insertError } = await supabase.from('member_checkins').insert(recordsToInsert);
+      
       if (insertError) throw insertError;
+      
       const validNames = validObjects.map(m => m.full_name);
       const { data: currentMembers } = await supabase.from('members').select('full_name, status').in('full_name', validNames);
+      
       if (currentMembers) {
         const firstTimersToUpdate = currentMembers.filter(m => m.status === '1st Timer').map(m => m.full_name);
         const secondTimersToUpdate = currentMembers.filter(m => m.status === '2nd Timer').map(m => m.full_name);
@@ -351,18 +341,12 @@ export default function App() {
     } catch (error: any) { setCheckinStatusMessage('❌ Error: ' + error.message); } finally { setIsSubmitting(false); }
   };
 
-  const handleGenerateMessage = async () => {
-    if (!promptContext) return; setIsGenerating(true); setGeneratedMessage('');
-    try { await new Promise(resolve => setTimeout(resolve, 2000)); setGeneratedMessage(`[ Simulated AI Response ]\n\nBlessings!\n\nOnce you connect Google Billing, Gemini AI will read "${promptContext}" and automatically draft a custom message.`); } catch (error: any) { setGeneratedMessage('❌ Error: ' + error.message); } finally { setIsGenerating(false); }
-  };
-
   const BirthdayRow = ({ person }: { person: any }) => (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#C8A24D]/10 last:border-0 p-4 hover:bg-[#C8A24D]/5 transition-colors gap-3">
       <div><div className="font-bold text-[#1C1730] text-lg font-inter">{person.full_name}</div><div className="text-[#1C1730]/60 text-sm font-plex">{person.date_of_birth} • {person.phone_number || 'No Phone'}</div></div>
       <div className="flex items-center gap-2 flex-wrap">
         <button onClick={() => handleSendMessage(person.phone_number, person.full_name, 'whatsapp', 'birthday')} className="flex items-center gap-1 bg-[#0B1330] text-[#F6F1E4] px-3 py-1.5 rounded hover:bg-[#2F1B4D] text-sm font-bold font-inter transition-colors"><MessageCircle size={16}/> WA</button>
         <button onClick={() => handleSendMessage(person.phone_number, person.full_name, 'sms', 'birthday')} className="flex items-center gap-1 bg-transparent border border-[#0B1330]/30 text-[#0B1330] px-3 py-1.5 rounded hover:bg-[#0B1330]/5 text-sm font-bold font-inter transition-colors"><MessageSquare size={16}/> SMS</button>
-        <button onClick={() => { setActiveView('outreach'); setPromptContext(`Draft a highly personalized, joyous, and prophetic birthday blessing for ${person.full_name} who is a member of Grace Citadel church.`); }} className="flex items-center gap-1 bg-[#C8A24D] text-[#0B1330] px-3 py-1.5 rounded hover:bg-[#b59040] text-sm font-bold font-inter transition-colors"><Sparkles size={16}/> AI</button>
       </div>
     </div>
   );
@@ -370,13 +354,9 @@ export default function App() {
   const guestTasks = crmTasks.filter(t => t.member.status === '1st Timer' || t.member.status === '2nd Timer');
   const urgentMissingTasks = crmTasks.filter(t => t.type.includes('RED') || t.type.includes('ORANGE'));
 
-  // ==========================================
-  // UI RENDER: LOGIN SCREEN (ROYAL NAVY DRAMA)
-  // ==========================================
   if (!session) {
     return (
       <div className="min-h-screen bg-[#0B1330] flex items-center justify-center p-4 relative overflow-hidden font-inter">
-        {/* Style injection for Google Fonts */}
         <style dangerouslySetInnerHTML={{__html: `
           @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Cormorant+Garamond:wght@600;700&family=IBM+Plex+Mono:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
           .font-cinzel { font-family: 'Cinzel', serif; }
@@ -387,15 +367,14 @@ export default function App() {
         <GraceCrest className="absolute w-[150vw] h-[150vw] -right-[30vw] -bottom-[30vw] pointer-events-none" opacity={0.03} />
         
         <div className="bg-[#F6F1E4] p-10 rounded-2xl shadow-2xl max-w-md w-full border border-[#C8A24D]/30 relative z-10">
-          <div className="flex justify-center mb-6"><GraceCrest className="w-20 h-20" opacity={1} /></div>
+          <div className="flex justify-center mb-6"><GraceCrest className="w-24 h-24" opacity={1} /></div>
           <h1 className="text-3xl font-cinzel font-bold text-center text-[#0B1330] mb-2 tracking-wide">Grace Citadel</h1>
-          <p className="text-center text-[#1C1730]/60 mb-8 font-inter uppercase tracking-widest text-xs font-bold">Command System</p>
           <form onSubmit={handleLogin} className="space-y-5">
-            <div><label className="block text-sm font-bold text-[#1C1730] mb-1 font-inter">Email / Clearance</label><input type="email" required value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} className="w-full bg-white border border-[#C8A24D]/40 rounded-md p-3 focus:border-[#C8A24D] focus:ring-1 focus:ring-[#C8A24D] outline-none text-[#1C1730] font-inter" /></div>
-            <div><label className="block text-sm font-bold text-[#1C1730] mb-1 font-inter">Passcode</label><input type="password" required value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} className="w-full bg-white border border-[#C8A24D]/40 rounded-md p-3 focus:border-[#C8A24D] focus:ring-1 focus:ring-[#C8A24D] outline-none text-[#1C1730] font-inter" /></div>
+            <div><label className="block text-sm font-bold text-[#1C1730] mb-1 font-inter">Email</label><input type="email" required value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} className="w-full bg-white border border-[#C8A24D]/40 rounded-md p-3 focus:border-[#C8A24D] focus:ring-1 focus:ring-[#C8A24D] outline-none text-[#1C1730] font-inter" /></div>
+            <div><label className="block text-sm font-bold text-[#1C1730] mb-1 font-inter">Password</label><input type="password" required value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} className="w-full bg-white border border-[#C8A24D]/40 rounded-md p-3 focus:border-[#C8A24D] focus:ring-1 focus:ring-[#C8A24D] outline-none text-[#1C1730] font-inter" /></div>
             {authError && <p className="text-[#6E1E2B] text-sm font-bold font-inter">{authError}</p>}
             <button type="submit" disabled={isAuthenticating} className="w-full bg-[#0B1330] text-[#C8A24D] p-4 rounded-md font-bold font-inter tracking-wide hover:bg-[#2F1B4D] transition-colors shadow-lg border border-[#0B1330]">
-                {isAuthenticating ? 'Authorizing...' : 'Secure Access'}
+                {isAuthenticating ? 'Authorizing...' : 'Secure Sign In'}
             </button>
           </form>
         </div>
@@ -406,12 +385,8 @@ export default function App() {
   const maxMonthlyTotal = monthlyChartData.length > 0 ? Math.max(...monthlyChartData.map(d => d.total)) : 1;
   const maxCellMonthlyTotal = cellStats.trendData.length > 0 ? Math.max(...cellStats.trendData.map(d => d.total)) : 1;
 
-  // ==========================================
-  // UI RENDER: MAIN APP (PARCHMENT, INK, GOLD)
-  // ==========================================
   return (
     <div className="min-h-screen bg-[#EBE7DD] flex flex-col font-inter">
-      {/* Style injection for Google Fonts */}
       <style dangerouslySetInnerHTML={{__html: `
         @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Cormorant+Garamond:wght@600;700&family=IBM+Plex+Mono:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
         .font-cinzel { font-family: 'Cinzel', serif; }
@@ -420,19 +395,14 @@ export default function App() {
         .font-inter { font-family: 'Inter', sans-serif; }
       `}} />
 
-      {/* HEADER: ROYAL NAVY CHROME */}
       <header className="bg-[#0B1330] border-b-2 border-[#C8A24D] px-6 py-4 flex items-center justify-between shadow-md relative z-20">
         <div className="flex items-center gap-4 cursor-pointer group" onClick={() => setActiveView('dashboard')}>
-          <GraceCrest className="w-12 h-12 transform group-hover:scale-105 transition-transform" />
+          <GraceCrest className="w-14 h-14 transform group-hover:scale-105 transition-transform" />
           <div>
             <h1 className="text-2xl font-cinzel font-bold text-[#C8A24D] tracking-wide leading-none">Grace Citadel</h1>
-            <p className="text-[10px] text-[#F6F1E4]/70 font-inter uppercase tracking-[0.2em] mt-1 font-bold">Command System</p>
           </div>
         </div>
         <div className="flex items-center gap-4">
-            <span className="text-[#F6F1E4]/70 font-plex text-xs hidden md:inline">
-                {isAdmin ? 'ADMIN CLEARANCE' : 'USHER PORTAL'}
-            </span>
             <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2 text-sm border border-[#C8A24D]/30 text-[#C8A24D] rounded-md hover:bg-[#2F1B4D] hover:border-[#C8A24D] font-bold transition-colors">
                 <LogOut size={16} /> Exit
             </button>
@@ -442,18 +412,15 @@ export default function App() {
       <main className="flex-1 p-6 relative">
         <GraceCrest className="absolute w-[60vw] h-[60vw] -left-[10vw] top-[10vw] pointer-events-none fixed" opacity={0.03} />
         
-        {/* DASHBOARD GRID */}
         {activeView === 'dashboard' && (
           <div className="max-w-7xl mx-auto space-y-6 relative z-10">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              
-              {/* EVERYONE: PARCHMENT CARDS */}
               <div className="bg-[#F6F1E4] p-6 rounded-xl shadow-sm border border-[#C8A24D]/20 hover:shadow-md hover:border-[#C8A24D]/50 transition-all cursor-pointer group" onClick={() => setActiveView('attendance')}>
                   <h2 className="text-2xl font-cormorant font-bold mb-2 text-[#0B1330] flex items-center gap-3"><CheckSquare size={22} className="text-[#C8A24D]"/> Service Check-In</h2>
                   <p className="text-[#1C1730]/70 text-sm font-inter">Log weekend service attendance roster.</p>
               </div>
               <div className="bg-[#F6F1E4] p-6 rounded-xl shadow-sm border border-[#C8A24D]/20 hover:shadow-md hover:border-[#C8A24D]/50 transition-all cursor-pointer group" onClick={() => {setActiveView('members'); setStatusMessage('');}}>
-                  <h2 className="text-2xl font-cormorant font-bold mb-2 text-[#0B1330] flex items-center gap-3"><UserPlus size={22} className="text-[#C8A24D]"/> Registration</h2>
+                  <h2 className="text-2xl font-cormorant font-bold mb-2 text-[#0B1330] flex items-center gap-3"><UserPlus size={22} className="text-[#C8A24D]"/> Registration Form</h2>
                   <p className="text-[#1C1730]/70 text-sm font-inter">Register new members and 1st timers.</p>
               </div>
               <div className="bg-[#F6F1E4] p-6 rounded-xl shadow-sm border border-[#C8A24D]/20 hover:shadow-md hover:border-[#C8A24D]/50 transition-all cursor-pointer group" onClick={() => {setActiveView('cell_log'); setCellStatusMessage('');}}>
@@ -463,33 +430,31 @@ export default function App() {
 
               {isAdmin && (
                 <>
-                  {/* ADMIN CHROME: NAVY & PURPLE */}
                   <div className="bg-[#2F1B4D] p-6 rounded-xl shadow-lg border border-[#C8A24D]/50 hover:shadow-xl hover:border-[#C8A24D] transition-all cursor-pointer relative overflow-hidden group" onClick={() => setActiveView('tasks')}>
                       <div className="absolute top-0 right-0 bg-[#6E1E2B] text-[#F6F1E4] font-plex text-xs font-bold px-3 py-1 rounded-bl-lg shadow-md">{crmTasks.length} PENDING</div>
-                      <h2 className="text-2xl font-cormorant font-bold mb-2 text-[#F6F1E4] flex items-center gap-3"><ShieldCheck size={22} className="text-[#C8A24D]"/> Pastoral Command</h2>
+                      <h2 className="text-2xl font-cormorant font-bold mb-2 text-[#F6F1E4] flex items-center gap-3"><ShieldCheck size={22} className="text-[#C8A24D]"/> Pastoral Command Center</h2>
                       <p className="text-[#F6F1E4]/70 text-sm font-inter">Centralized hub for all pastoral tasks.</p>
                   </div>
                   <div className="bg-[#0B1330] p-6 rounded-xl shadow-lg border border-[#C8A24D]/50 hover:shadow-xl hover:border-[#C8A24D] transition-all cursor-pointer group" onClick={() => setActiveView('analytics')}>
-                      <h2 className="text-2xl font-cormorant font-bold mb-2 text-[#F6F1E4] flex items-center gap-3"><TrendingUp size={22} className="text-[#C8A24D]"/> Intelligence Hub</h2>
+                      <h2 className="text-2xl font-cormorant font-bold mb-2 text-[#F6F1E4] flex items-center gap-3"><TrendingUp size={22} className="text-[#C8A24D]"/> Service & Cell Analytics</h2>
                       <p className="text-[#F6F1E4]/70 text-sm font-inter">Visual analytics for structural church growth.</p>
                   </div>
                   <div className="bg-[#0B1330] p-6 rounded-xl shadow-lg border border-[#C8A24D]/50 hover:shadow-xl hover:border-[#C8A24D] transition-all cursor-pointer group" onClick={() => setActiveView('bulk')}>
-                      <h2 className="text-2xl font-cormorant font-bold mb-2 text-[#F6F1E4] flex items-center gap-3"><Share2 size={22} className="text-[#C8A24D]"/> Outreach Node</h2>
+                      <h2 className="text-2xl font-cormorant font-bold mb-2 text-[#F6F1E4] flex items-center gap-3"><Share2 size={22} className="text-[#C8A24D]"/> Bulk Outreach Node</h2>
                       <p className="text-[#F6F1E4]/70 text-sm font-inter">Execute targeted demographic broadcast queues.</p>
                   </div>
 
-                  {/* ADMIN CARDS: PARCHMENT */}
                   <div className="bg-[#F6F1E4] p-6 rounded-xl shadow-sm border border-[#C8A24D]/20 hover:shadow-md hover:border-[#C8A24D]/50 transition-all cursor-pointer" onClick={() => setActiveView('absentees')}>
-                      <h2 className="text-2xl font-cormorant font-bold mb-2 text-[#0B1330] flex items-center gap-3"><UserMinus size={22} className="text-[#6E1E2B]"/> Radar Triage</h2>
+                      <h2 className="text-2xl font-cormorant font-bold mb-2 text-[#0B1330] flex items-center gap-3"><UserMinus size={22} className="text-[#6E1E2B]"/> Smart Absentee Radar</h2>
                       <p className="text-[#1C1730]/70 text-sm font-inter">Absentee heat-map and alert levels.</p>
                   </div>
                   <div className="bg-[#F6F1E4] p-6 rounded-xl shadow-sm border border-[#C8A24D]/20 hover:shadow-md hover:border-[#C8A24D]/50 transition-all cursor-pointer relative" onClick={() => setActiveView('birthdays')}>
                       {birthdaysToday.length > 0 && <div className="absolute top-0 right-0 bg-[#0B1330] text-[#C8A24D] font-plex text-xs font-bold px-3 py-1 rounded-bl-lg shadow-sm border-l border-b border-[#C8A24D]/50">TODAY!</div>}
-                      <h2 className="text-2xl font-cormorant font-bold mb-2 text-[#0B1330] flex items-center gap-3"><Gift size={22} className="text-[#C8A24D]"/> Birthday Records</h2>
+                      <h2 className="text-2xl font-cormorant font-bold mb-2 text-[#0B1330] flex items-center gap-3"><Gift size={22} className="text-[#C8A24D]"/> Birthday Dashboard</h2>
                       <p className="text-[#1C1730]/70 text-sm font-inter">Manage upcoming congregational milestones.</p>
                   </div>
                   <div className="bg-[#F6F1E4] p-6 rounded-xl shadow-sm border border-[#C8A24D]/20 hover:shadow-md hover:border-[#C8A24D]/50 transition-all cursor-pointer" onClick={() => setActiveView('guests')}>
-                      <h2 className="text-2xl font-cormorant font-bold mb-2 text-[#0B1330] flex items-center gap-3"><ClipboardList size={22} className="text-[#C8A24D]"/> Guest Roster</h2>
+                      <h2 className="text-2xl font-cormorant font-bold mb-2 text-[#0B1330] flex items-center gap-3"><ClipboardList size={22} className="text-[#C8A24D]"/> Guest Follow-Up Roster</h2>
                       <p className="text-[#1C1730]/70 text-sm font-inter">Direct access to 1st and 2nd Timers.</p>
                   </div>
                 </>
@@ -498,43 +463,37 @@ export default function App() {
           </div>
         )}
 
-        {/* --- 🔥 PASTORAL COMMAND CENTER (PURPLE & GOLD CHROME) 🔥 --- */}
         {activeView === 'tasks' && isAdmin && (
             <div className="max-w-6xl mx-auto space-y-6 relative z-10">
-                <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] transition-colors"><ArrowLeft size={16} /> Retreat to Dashboard</button>
-                
+                <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] transition-colors"><ArrowLeft size={16} /> Back to Dashboard</button>
                 <div className="bg-[#2F1B4D] p-8 rounded-xl shadow-xl border border-[#C8A24D]/40 text-[#F6F1E4] flex flex-col sm:flex-row items-center justify-between gap-6">
                     <div>
-                        <h2 className="text-4xl font-cormorant font-bold flex items-center gap-3 tracking-wide"><ShieldCheck className="text-[#C8A24D]" size={36}/> Pastoral Command</h2>
-                        <p className="text-[#F6F1E4]/60 text-sm font-inter mt-1">Aggregated operational oversight node.</p>
+                        <h2 className="text-4xl font-cormorant font-bold flex items-center gap-3 tracking-wide"><ShieldCheck className="text-[#C8A24D]" size={36}/> Pastoral Command Center</h2>
                     </div>
                     <div className="flex gap-4">
                         <button onClick={handleGenerateMondayReport} disabled={isSubmitting} className="flex items-center gap-2 bg-[#0B1330] hover:bg-[#1C1730] border border-[#C8A24D] text-[#C8A24D] px-5 py-3 rounded-lg font-bold text-sm font-inter transition-colors shadow-lg">
-                            <FileText size={18} /> Execute Weekly Report
+                            <FileText size={18} /> Generate Monday Report
                         </button>
                         <div className="bg-[#1C1730] border border-[#C8A24D]/50 px-6 py-2 rounded-lg text-center shadow-inner">
                             <div className="text-2xl font-plex font-bold text-[#C8A24D]">{crmTasks.length}</div>
-                            <div className="text-[10px] text-[#F6F1E4]/50 font-bold uppercase tracking-widest font-inter">Queue</div>
                         </div>
                     </div>
                 </div>
-
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div className="space-y-6">
-                        {/* PARCHMENT CONTENT SURFACES */}
                         <div className="bg-[#F6F1E4] border border-[#C8A24D]/30 rounded-xl p-6 shadow-sm">
                             <h3 className="text-2xl font-cormorant font-bold text-[#0B1330] mb-4 flex items-center gap-2"><Gift size={22} className="text-[#C8A24D]"/> Today's Birthdays</h3>
-                            {birthdaysToday.length === 0 ? <p className="text-[#1C1730]/50 text-sm font-inter font-bold italic">No milestones registered today.</p> : birthdaysToday.map((p, i) => (
+                            {birthdaysToday.length === 0 ? <p className="text-[#1C1730]/50 text-sm font-inter font-bold italic">No birthdays today.</p> : birthdaysToday.map((p, i) => (
                                 <div key={i} className="bg-white p-4 rounded-lg border border-[#C8A24D]/20 flex justify-between items-center mb-3 shadow-sm">
                                     <span className="font-bold text-[#1C1730] font-inter text-lg">{p.full_name}</span>
                                     <div className="flex gap-2">
-                                        <button onClick={() => handleSendMessage(p.phone_number, p.full_name, 'whatsapp', 'birthday')} className="text-xs font-bold font-inter bg-[#0B1330] text-[#F6F1E4] px-3 py-2 rounded hover:bg-[#2F1B4D] transition-colors shadow">WA Dispatch</button>
+                                        <button onClick={() => handleSendMessage(p.phone_number, p.full_name, 'whatsapp', 'birthday')} className="text-xs font-bold font-inter bg-[#0B1330] text-[#F6F1E4] px-3 py-2 rounded hover:bg-[#2F1B4D] transition-colors shadow">WhatsApp</button>
                                     </div>
                                 </div>
                             ))}
                         </div>
                         <div className="bg-[#F6F1E4] border border-[#C8A24D]/30 rounded-xl p-6 shadow-sm">
-                            <h3 className="text-2xl font-cormorant font-bold text-[#0B1330] mb-4 flex items-center gap-2"><Sparkles size={22} className="text-[#C8A24D]"/> New Guest Operations</h3>
+                            <h3 className="text-2xl font-cormorant font-bold text-[#0B1330] mb-4 flex items-center gap-2"><Sparkles size={22} className="text-[#C8A24D]"/> New Guests Follow-Up</h3>
                             {guestTasks.length === 0 ? <p className="text-[#1C1730]/50 text-sm font-inter font-bold italic">Queue cleared.</p> : guestTasks.map((t, i) => (
                                 <div key={i} className="bg-white p-4 rounded-lg border border-[#C8A24D]/20 flex justify-between items-center mb-3 shadow-sm">
                                     <div>
@@ -549,7 +508,7 @@ export default function App() {
                     <div className="space-y-6">
                         <div className="bg-[#F6F1E4] border border-[#6E1E2B]/30 rounded-xl p-6 shadow-sm relative overflow-hidden">
                             <div className="absolute top-0 left-0 w-1 h-full bg-[#6E1E2B]"></div>
-                            <h3 className="text-2xl font-cormorant font-bold text-[#6E1E2B] mb-4 flex items-center gap-2"><UserMinus size={22}/> Urgent Triage: Missing</h3>
+                            <h3 className="text-2xl font-cormorant font-bold text-[#6E1E2B] mb-4 flex items-center gap-2"><UserMinus size={22}/> Urgent: Missing Members</h3>
                             {urgentMissingTasks.length === 0 ? <p className="text-[#1C1730]/50 text-sm font-inter font-bold italic">No critical absences detected.</p> : urgentMissingTasks.map((t, i) => (
                                 <div key={i} className="bg-white p-4 rounded-lg border border-[#6E1E2B]/20 flex justify-between items-center mb-3 shadow-sm">
                                     <div>
@@ -565,85 +524,57 @@ export default function App() {
             </div>
         )}
 
-        {/* --- 🔥 OUTREACH NODE (BULK QUEUE) 🔥 --- */}
         {activeView === 'bulk' && isAdmin && (
             <div className="max-w-4xl mx-auto relative z-10">
-                <button onClick={() => { setActiveView('dashboard'); setBulkQueue([]); }} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] mb-6 transition-colors"><ArrowLeft size={16} /> Retreat to Dashboard</button>
-                
+                <button onClick={() => { setActiveView('dashboard'); setBulkQueue([]); }} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] mb-6 transition-colors"><ArrowLeft size={16} /> Back to Dashboard</button>
                 <div className="bg-[#0B1330] text-[#F6F1E4] p-8 rounded-t-2xl border-b border-[#C8A24D]">
-                    <h2 className="text-4xl font-cormorant font-bold flex items-center gap-3"><Share2 className="text-[#C8A24D]"/> Demographic Outreach Node</h2>
-                    <p className="text-[#F6F1E4]/60 font-inter text-sm mt-2">Initialize batch communication scripts to specific societal divisions.</p>
+                    <h2 className="text-4xl font-cormorant font-bold flex items-center gap-3"><Share2 className="text-[#C8A24D]"/> Bulk Broadcast Engine</h2>
                 </div>
-                
                 <div className="bg-[#F6F1E4] p-8 rounded-b-2xl shadow-xl border border-t-0 border-[#C8A24D]/30">
                     {bulkQueue.length > 0 ? (
-                        /* ACTIVE QUEUE UI */
                         <div className="bg-white p-8 rounded-xl border border-[#C8A24D] shadow-inner">
                             <div className="flex justify-between items-start mb-8">
-                                <div>
-                                    <h3 className="text-2xl font-cormorant font-bold text-[#0B1330] flex items-center gap-2"><MessageCircle className="text-[#C8A24D]" /> Dispatch Queue Active</h3>
-                                    <p className="text-sm font-plex text-[#1C1730]/60 mt-1 uppercase tracking-widest">Target: {bulkGroup} Division</p>
-                                </div>
-                                <div className="bg-[#0B1330] text-[#C8A24D] font-plex font-bold px-4 py-2 rounded shadow">
-                                    {bulkQueueIndex} / {bulkQueue.length}
-                                </div>
+                                <div><h3 className="text-2xl font-cormorant font-bold text-[#0B1330] flex items-center gap-2"><MessageCircle className="text-[#C8A24D]" /> WhatsApp Queue Active</h3></div>
+                                <div className="bg-[#0B1330] text-[#C8A24D] font-plex font-bold px-4 py-2 rounded shadow">{bulkQueueIndex} / {bulkQueue.length}</div>
                             </div>
-
                             {bulkQueueIndex < bulkQueue.length ? (
                                 <div className="text-center py-6">
-                                    <p className="text-[#1C1730]/50 font-bold font-inter uppercase text-sm mb-2 tracking-widest">Next Target Assigned</p>
+                                    <p className="text-[#1C1730]/50 font-bold font-inter uppercase text-sm mb-2 tracking-widest">Up Next:</p>
                                     <p className="text-4xl font-cormorant font-bold text-[#0B1330] mb-8">{bulkQueue[bulkQueueIndex].name}</p>
                                     <div className="flex flex-col sm:flex-row justify-center gap-4">
-                                        <button onClick={sendNextInQueue} className="bg-[#C8A24D] text-[#0B1330] px-8 py-4 rounded font-bold font-inter hover:bg-[#b59040] shadow-lg transition-colors flex items-center justify-center gap-2 tracking-wide">
-                                            Execute & Advance &rarr;
-                                        </button>
-                                        <button onClick={() => setBulkQueue([])} className="bg-transparent text-[#6E1E2B] border-2 border-[#6E1E2B] px-8 py-4 rounded font-bold font-inter hover:bg-[#6E1E2B]/10 transition-colors tracking-wide">
-                                            Abort Queue
-                                        </button>
+                                        <button onClick={sendNextInQueue} className="bg-[#C8A24D] text-[#0B1330] px-8 py-4 rounded font-bold font-inter hover:bg-[#b59040] shadow-lg transition-colors flex items-center justify-center gap-2 tracking-wide">Send & Load Next &rarr;</button>
+                                        <button onClick={() => setBulkQueue([])} className="bg-transparent text-[#6E1E2B] border-2 border-[#6E1E2B] px-8 py-4 rounded font-bold font-inter hover:bg-[#6E1E2B]/10 transition-colors tracking-wide">Cancel Queue</button>
                                     </div>
                                 </div>
                             ) : (
                                 <div className="text-center py-10">
                                     <div className="text-5xl mb-4 text-[#C8A24D]">◆</div>
-                                    <h3 className="text-3xl font-cormorant font-bold text-[#0B1330] mb-2">Operation Complete</h3>
-                                    <p className="text-[#1C1730]/70 font-inter mb-8">All {bulkQueue.length} missives have been delivered.</p>
-                                    <button onClick={() => setBulkQueue([])} className="bg-[#0B1330] text-[#C8A24D] px-8 py-3 rounded font-bold font-inter hover:bg-[#2F1B4D] shadow">
-                                        Reset Node
-                                    </button>
+                                    <h3 className="text-3xl font-cormorant font-bold text-[#0B1330] mb-2">Broadcast Complete!</h3>
+                                    <p className="text-[#1C1730]/70 font-inter mb-8">All {bulkQueue.length} messages have been delivered.</p>
+                                    <button onClick={() => setBulkQueue([])} className="bg-[#0B1330] text-[#C8A24D] px-8 py-3 rounded font-bold font-inter hover:bg-[#2F1B4D] shadow">Start New Broadcast</button>
                                 </div>
                             )}
                         </div>
                     ) : (
-                        /* SETUP UI */
                         <div className="space-y-8 max-w-2xl">
                             <div>
-                                <label className="block text-sm font-bold font-inter text-[#0B1330] mb-3 uppercase tracking-widest">Division Target</label>
+                                <label className="block text-sm font-bold font-inter text-[#0B1330] mb-3 uppercase tracking-widest">Target Segment</label>
                                 <div className="flex gap-4">
                                     {['Student', 'Men', 'Women'].map(group => (
                                         <label key={group} className={`flex items-center justify-center gap-2 border-2 px-6 py-4 rounded cursor-pointer select-none flex-1 transition-all ${bulkGroup === group ? 'border-[#C8A24D] bg-[#0B1330] text-[#C8A24D]' : 'border-[#C8A24D]/30 bg-white text-[#1C1730] hover:border-[#C8A24D]/60'}`}>
-                                            <input type="radio" checked={bulkGroup === group} onChange={() => {
-                                                setBulkGroup(group); 
-                                                setBulkText(group === 'Student' ? TEMPLATES.bulk_student : TEMPLATES.bulk_men);
-                                            }} className="hidden" />
+                                            <input type="radio" checked={bulkGroup === group} onChange={() => {setBulkGroup(group); setBulkText(group === 'Student' ? TEMPLATES.bulk_student : TEMPLATES.bulk_men);}} className="hidden" />
                                             <span className="font-bold font-inter">{group}</span>
                                         </label>
                                     ))}
                                 </div>
                             </div>
-
                             <div>
-                                <label className="block text-sm font-bold font-inter text-[#0B1330] mb-1 uppercase tracking-widest">Script Formulation</label>
-                                <p className="text-xs text-[#1C1730]/60 font-inter mb-3 font-bold">Inject <code className="text-[#C8A24D] bg-[#0B1330] px-1 py-0.5 rounded">{"{name}"}</code> for dynamic target insertion.</p>
+                                <label className="block text-sm font-bold font-inter text-[#0B1330] mb-1 uppercase tracking-widest">Announcement Script</label>
                                 <textarea rows={6} value={bulkText} onChange={(e) => setBulkText(e.target.value)} className="w-full bg-white border border-[#C8A24D]/40 rounded-md p-4 font-inter text-[#1C1730] outline-none focus:border-[#C8A24D] focus:ring-1 focus:ring-[#C8A24D] shadow-inner" />
                             </div>
-
                             <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t border-[#C8A24D]/20">
-                                <button onClick={prepareBulkQueue} disabled={isSubmitting} className="flex-1 bg-[#C8A24D] text-[#0B1330] font-bold font-inter tracking-wide py-4 rounded shadow-lg hover:bg-[#b59040] flex items-center justify-center gap-2 transition-colors disabled:opacity-50">
-                                    {isSubmitting ? 'Processing...' : <><MessageCircle size={22}/> Initialize WA Queue</>}
-                                </button>
-                                <button onClick={handleSendBulkSMS} disabled={isSubmitting} className="flex-1 bg-[#0B1330] text-[#C8A24D] font-bold font-inter tracking-wide py-4 rounded shadow-lg hover:bg-[#2F1B4D] flex items-center justify-center gap-2 transition-colors disabled:opacity-50 border border-[#C8A24D]/50">
-                                    <MessageSquare size={22}/> Execute SMS Batch
-                                </button>
+                                <button onClick={prepareBulkQueue} disabled={isSubmitting} className="flex-1 bg-[#C8A24D] text-[#0B1330] font-bold font-inter tracking-wide py-4 rounded shadow-lg hover:bg-[#b59040] flex items-center justify-center gap-2 transition-colors disabled:opacity-50">{isSubmitting ? 'Processing...' : <><MessageCircle size={22}/> Start WhatsApp Queue</>}</button>
+                                <button onClick={handleSendBulkSMS} disabled={isSubmitting} className="flex-1 bg-[#0B1330] text-[#C8A24D] font-bold font-inter tracking-wide py-4 rounded shadow-lg hover:bg-[#2F1B4D] flex items-center justify-center gap-2 transition-colors disabled:opacity-50 border border-[#C8A24D]/50"><MessageSquare size={22}/> Send Bulk SMS</button>
                             </div>
                         </div>
                     )}
@@ -651,28 +582,21 @@ export default function App() {
             </div>
         )}
 
-        {/* --- 🔥 INTELLIGENCE HUB (ANALYTICS) 🔥 --- */}
         {activeView === 'analytics' && isAdmin && (
           <div className="max-w-6xl mx-auto space-y-6 relative z-10">
-            <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] transition-colors"><ArrowLeft size={16} /> Retreat to Dashboard</button>
-            
+            <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] transition-colors"><ArrowLeft size={16} /> Back to Dashboard</button>
             <div className="bg-[#0B1330] p-8 rounded-xl shadow-xl border border-[#C8A24D]/40 text-[#F6F1E4] flex flex-col md:flex-row md:items-center justify-between gap-6">
-                <div>
-                    <h2 className="text-4xl font-cormorant font-bold mb-2 flex items-center gap-3"><TrendingUp size={36} className="text-[#C8A24D]"/> Intelligence Hub</h2>
-                    <p className="text-[#F6F1E4]/60 font-inter text-sm">Structural growth and metric analysis.</p>
-                </div>
+                <div><h2 className="text-4xl font-cormorant font-bold mb-2 flex items-center gap-3"><TrendingUp size={36} className="text-[#C8A24D]"/> Central Analytics Hub</h2></div>
                 <div className="flex bg-[#1C1730] p-1 rounded border border-[#C8A24D]/30 shadow-inner">
-                    <button onClick={() => setAnalyticsTab('service')} className={`px-6 py-2 rounded font-bold font-inter text-sm tracking-wide transition-all ${analyticsTab === 'service' ? 'bg-[#C8A24D] text-[#0B1330]' : 'text-[#C8A24D] hover:text-[#F6F1E4]'}`}>Congregation</button>
-                    <button onClick={() => setAnalyticsTab('cells')} className={`px-6 py-2 rounded font-bold font-inter text-sm tracking-wide transition-all ${analyticsTab === 'cells' ? 'bg-[#C8A24D] text-[#0B1330]' : 'text-[#C8A24D] hover:text-[#F6F1E4]'}`}>Cell Sectors</button>
+                    <button onClick={() => setAnalyticsTab('service')} className={`px-6 py-2 rounded font-bold font-inter text-sm tracking-wide transition-all ${analyticsTab === 'service' ? 'bg-[#C8A24D] text-[#0B1330]' : 'text-[#C8A24D] hover:text-[#F6F1E4]'}`}>Sunday Services</button>
+                    <button onClick={() => setAnalyticsTab('cells')} className={`px-6 py-2 rounded font-bold font-inter text-sm tracking-wide transition-all ${analyticsTab === 'cells' ? 'bg-[#C8A24D] text-[#0B1330]' : 'text-[#C8A24D] hover:text-[#F6F1E4]'}`}>Cell Groups</button>
                 </div>
             </div>
-
-            {/* TAB: SUNDAY SERVICES */}
             {analyticsTab === 'service' && (
                 <>
                     <div className="bg-[#F6F1E4] p-8 rounded-xl shadow-sm border border-[#C8A24D]/30">
-                        <h3 className="text-2xl font-cormorant font-bold text-[#0B1330] mb-8 border-b-2 border-[#C8A24D]/20 pb-4">Monthly Trajectory</h3>
-                        {monthlyChartData.length === 0 ? (<div className="text-center p-12 text-[#1C1730]/50 font-plex italic">Insufficient data points.</div>) : (
+                        <h3 className="text-2xl font-cormorant font-bold text-[#0B1330] mb-8 border-b-2 border-[#C8A24D]/20 pb-4">Monthly Service Growth</h3>
+                        {monthlyChartData.length === 0 ? (<div className="text-center p-12 text-[#1C1730]/50 font-plex italic">No data yet.</div>) : (
                             <div className="flex items-end gap-2 md:gap-6 h-64 mt-8 pb-4 border-b border-[#0B1330]/10 overflow-x-auto">
                                 {monthlyChartData.map((data, idx) => {
                                     const barHeight = Math.max((data.total / maxMonthlyTotal) * 100, 5);
@@ -689,119 +613,32 @@ export default function App() {
                         )}
                     </div>
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div className="bg-[#F6F1E4] rounded-xl shadow-sm border border-[#C8A24D]/30 overflow-hidden">
-                            <div className="bg-[#0B1330] p-5 border-b border-[#C8A24D]/40">
-                                <h3 className="text-xl font-cormorant font-bold text-[#C8A24D] flex items-center gap-2"><CalendarDays size={20}/> {selectedMonthData ? `Vector: ${selectedMonthData.monthName}` : 'Select a vector above'}</h3>
-                            </div>
-                            <div className="p-0">
-                                {!selectedMonthData ? (<div className="p-12 text-center text-[#1C1730]/50 font-plex italic">Awaiting selection.</div>) : (
-                                    <table className="w-full text-left border-collapse">
-                                        <thead><tr className="bg-white border-b border-[#C8A24D]/20 text-xs font-inter uppercase tracking-widest text-[#1C1730]/60 font-bold"><th className="p-5">Temporal Index</th><th className="p-5">Volume</th></tr></thead>
-                                        <tbody className="divide-y divide-[#C8A24D]/10">
-                                            {Object.entries(selectedMonthData.services).sort().map(([date, count]: [string, any], idx) => (
-                                                <tr key={idx} className="hover:bg-[#C8A24D]/5 transition-colors bg-[#F6F1E4]">
-                                                    <td className="p-5 font-bold font-inter text-[#1C1730]">{new Date(date).toLocaleDateString()}</td>
-                                                    <td className="p-5 font-plex font-bold text-[#0B1330] text-lg">{count}</td>
-                                                </tr>
-                                            ))}
-                                            <tr className="bg-[#C8A24D] text-[#0B1330] border-t-2 border-[#0B1330]">
-                                                <td className="p-5 text-right font-inter font-bold uppercase tracking-widest text-xs">Total Volume</td>
-                                                <td className="p-5 font-plex font-bold text-2xl">{selectedMonthData.total}</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                )}
-                            </div>
-                        </div>
-                        <div className="bg-[#F6F1E4] rounded-xl shadow-sm border border-[#C8A24D]/30 overflow-hidden">
-                            <div className="bg-white p-5 border-b-2 border-[#C8A24D]/20">
-                                <h3 className="text-xl font-cormorant font-bold text-[#0B1330] flex items-center gap-2"><Users size={20} className="text-[#C8A24D]"/> Vanguard Roster (Consistency)</h3>
-                            </div>
-                            <div className="max-h-[400px] overflow-y-auto">
-                                <table className="w-full text-left border-collapse">
-                                    <thead><tr className="bg-white border-b border-[#C8A24D]/20 text-xs font-inter uppercase tracking-widest text-[#1C1730]/60 font-bold sticky top-0 shadow-sm"><th className="p-5">Identity</th><th className="p-5">Cycles</th></tr></thead>
-                                    <tbody className="divide-y divide-[#C8A24D]/10 bg-[#F6F1E4]">
-                                        {memberStats.length === 0 ? (<tr><td colSpan={2} className="p-8 text-center text-[#1C1730]/50 font-plex italic">No data acquired.</td></tr>) : (
-                                            memberStats.map((member, idx) => (
-                                                <tr key={idx} className="hover:bg-[#C8A24D]/5">
-                                                    <td className="p-5 font-bold font-inter text-[#1C1730] flex items-center gap-2">{idx < 3 && <span className="text-[#C8A24D]">◆</span>}{member.name}</td>
-                                                    <td className="p-5 font-plex font-bold text-[#0B1330]">{member.count}</td>
-                                                </tr>
-                                            ))
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
+                        <div className="bg-[#F6F1E4] rounded-xl shadow-sm border border-[#C8A24D]/30 overflow-hidden"><div className="bg-[#0B1330] p-5 border-b border-[#C8A24D]/40"><h3 className="text-xl font-cormorant font-bold text-[#C8A24D] flex items-center gap-2"><CalendarDays size={20}/> {selectedMonthData ? `Service Breakdown: ${selectedMonthData.monthName}` : 'Select a month above'}</h3></div><div className="p-0">{!selectedMonthData ? (<div className="p-12 text-center text-[#1C1730]/50 font-plex italic">Awaiting selection.</div>) : (<table className="w-full text-left border-collapse"><thead><tr className="bg-white border-b border-[#C8A24D]/20 text-xs font-inter uppercase tracking-widest text-[#1C1730]/60 font-bold"><th className="p-5">Date</th><th className="p-5">Attendance</th></tr></thead><tbody className="divide-y divide-[#C8A24D]/10">{Object.entries(selectedMonthData.services).sort().map(([date, count]: [string, any], idx) => (<tr key={idx} className="hover:bg-[#C8A24D]/5 transition-colors bg-[#F6F1E4]"><td className="p-5 font-bold font-inter text-[#1C1730]">{new Date(date).toLocaleDateString()}</td><td className="p-5 font-plex font-bold text-[#0B1330] text-lg">{count}</td></tr>))}<tr className="bg-[#C8A24D] text-[#0B1330] border-t-2 border-[#0B1330]"><td className="p-5 text-right font-inter font-bold uppercase tracking-widest text-xs">Total</td><td className="p-5 font-plex font-bold text-2xl">{selectedMonthData.total}</td></tr></tbody></table>)}</div></div>
+                        <div className="bg-[#F6F1E4] rounded-xl shadow-sm border border-[#C8A24D]/30 overflow-hidden"><div className="bg-white p-5 border-b-2 border-[#C8A24D]/20"><h3 className="text-xl font-cormorant font-bold text-[#0B1330] flex items-center gap-2"><Users size={20} className="text-[#C8A24D]"/> Consistency Leaderboard</h3></div><div className="max-h-[400px] overflow-y-auto"><table className="w-full text-left border-collapse"><thead><tr className="bg-white border-b border-[#C8A24D]/20 text-xs font-inter uppercase tracking-widest text-[#1C1730]/60 font-bold sticky top-0 shadow-sm"><th className="p-5">Member</th><th className="p-5">Services Attended</th></tr></thead><tbody className="divide-y divide-[#C8A24D]/10 bg-[#F6F1E4]">{memberStats.length === 0 ? (<tr><td colSpan={2} className="p-8 text-center text-[#1C1730]/50 font-plex italic">No data acquired.</td></tr>) : (memberStats.map((member, idx) => (<tr key={idx} className="hover:bg-[#C8A24D]/5"><td className="p-5 font-bold font-inter text-[#1C1730] flex items-center gap-2">{idx < 3 && <span className="text-[#C8A24D]">◆</span>}{member.name}</td><td className="p-5 font-plex font-bold text-[#0B1330]">{member.count}</td></tr>)))}</tbody></table></div></div>
                     </div>
                 </>
             )}
-
-            {/* TAB: CELL GROUPS */}
             {analyticsTab === 'cells' && (
                 <>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                        <div className="bg-[#F6F1E4] p-6 rounded-xl border border-[#C8A24D]/30 shadow-sm flex items-center gap-5 border-l-4 border-l-[#0B1330]">
-                            <div className="bg-[#0B1330] p-4 rounded text-[#C8A24D]"><Users size={28}/></div>
-                            <div><p className="text-[10px] text-[#1C1730]/60 font-bold font-inter uppercase tracking-widest">Mean Sector Size</p><p className="text-4xl font-plex font-bold text-[#0B1330]">{cellStats.overallAvg}</p></div>
-                        </div>
-                        <div className="bg-[#F6F1E4] p-6 rounded-xl border border-[#C8A24D]/30 shadow-sm flex items-center gap-5 border-l-4 border-l-[#C8A24D]">
-                            <div className="bg-[#C8A24D] p-4 rounded text-[#0B1330] font-bold text-2xl font-plex">◆</div>
-                            <div className="overflow-hidden"><p className="text-[10px] text-[#1C1730]/60 font-bold font-inter uppercase tracking-widest">Prime Sector</p><p className="text-xl font-cormorant font-bold text-[#0B1330] truncate">{cellStats.bestCell}</p></div>
-                        </div>
-                        <div className="bg-[#F6F1E4] p-6 rounded-xl border border-[#C8A24D]/30 shadow-sm flex items-center gap-5 border-l-4 border-l-[#0B1330]">
-                            <div className="bg-[#0B1330] p-4 rounded text-[#C8A24D]"><Activity size={28}/></div>
-                            <div className="overflow-hidden"><p className="text-[10px] text-[#1C1730]/60 font-bold font-inter uppercase tracking-widest">Max Velocity</p><p className="text-xl font-cormorant font-bold text-[#0B1330] truncate">{cellStats.fastestGrowing}</p></div>
-                        </div>
+                        <div className="bg-[#F6F1E4] p-6 rounded-xl border border-[#C8A24D]/30 shadow-sm flex items-center gap-5 border-l-4 border-l-[#0B1330]"><div className="bg-[#0B1330] p-4 rounded text-[#C8A24D]"><Users size={28}/></div><div><p className="text-[10px] text-[#1C1730]/60 font-bold font-inter uppercase tracking-widest">Average Cell Size</p><p className="text-4xl font-plex font-bold text-[#0B1330]">{cellStats.overallAvg}</p></div></div>
+                        <div className="bg-[#F6F1E4] p-6 rounded-xl border border-[#C8A24D]/30 shadow-sm flex items-center gap-5 border-l-4 border-l-[#C8A24D]"><div className="bg-[#C8A24D] p-4 rounded text-[#0B1330] font-bold text-2xl font-plex">◆</div><div className="overflow-hidden"><p className="text-[10px] text-[#1C1730]/60 font-bold font-inter uppercase tracking-widest">Best Performing</p><p className="text-xl font-cormorant font-bold text-[#0B1330] truncate">{cellStats.bestCell}</p></div></div>
+                        <div className="bg-[#F6F1E4] p-6 rounded-xl border border-[#C8A24D]/30 shadow-sm flex items-center gap-5 border-l-4 border-l-[#0B1330]"><div className="bg-[#0B1330] p-4 rounded text-[#C8A24D]"><Activity size={28}/></div><div className="overflow-hidden"><p className="text-[10px] text-[#1C1730]/60 font-bold font-inter uppercase tracking-widest">Fastest Growing</p><p className="text-xl font-cormorant font-bold text-[#0B1330] truncate">{cellStats.fastestGrowing}</p></div></div>
                     </div>
-                    
-                    <div className="bg-[#F6F1E4] rounded-xl shadow-sm border border-[#C8A24D]/30 overflow-hidden">
-                        <div className="bg-[#0B1330] p-5 border-b border-[#C8A24D]/40">
-                            <h3 className="text-xl font-cormorant font-bold text-[#C8A24D] flex items-center gap-2"><Home size={20}/> Sector Matrix</h3>
-                        </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse">
-                                <thead>
-                                    <tr className="bg-white border-b border-[#C8A24D]/20 text-xs font-inter uppercase tracking-widest text-[#1C1730]/60 font-bold">
-                                        <th className="p-5">Sector Designation</th>
-                                        <th className="p-5">Mean Yield</th>
-                                        <th className="p-5">Cycles</th>
-                                        <th className="p-5">Velocity (Growth)</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-[#C8A24D]/10 bg-[#F6F1E4]">
-                                    {cellStats.cellsArray.length === 0 ? (<tr><td colSpan={4} className="p-8 text-center text-[#1C1730]/50 font-plex italic">No sectors registered.</td></tr>) : (
-                                        cellStats.cellsArray.map((cell: any, idx: number) => (
-                                            <tr key={idx} className="hover:bg-[#C8A24D]/5 transition-colors">
-                                                <td className="p-5 font-bold font-inter text-[#1C1730]">{cell.name}</td>
-                                                <td className="p-5 font-plex font-bold text-[#0B1330] text-lg">{cell.avg}</td>
-                                                <td className="p-5 font-plex text-[#1C1730]/70">{cell.count}</td>
-                                                <td className="p-5 font-plex font-bold">
-                                                    {cell.growth > 0 ? <span className="text-[#0B1330] flex items-center gap-1">+{cell.growth} <TrendingUp size={14} className="text-[#C8A24D]"/></span> : 
-                                                     cell.growth < 0 ? <span className="text-[#6E1E2B]">{cell.growth}</span> : 
-                                                     <span className="text-[#1C1730]/40">Static</span>}
-                                                </td>
-                                            </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+                    <div className="bg-[#F6F1E4] rounded-xl shadow-sm border border-[#C8A24D]/30 overflow-hidden"><div className="bg-[#0B1330] p-5 border-b border-[#C8A24D]/40"><h3 className="text-xl font-cormorant font-bold text-[#C8A24D] flex items-center gap-2"><Home size={20}/> Cell Group Leaderboard</h3></div><div className="overflow-x-auto"><table className="w-full text-left border-collapse"><thead><tr className="bg-white border-b border-[#C8A24D]/20 text-xs font-inter uppercase tracking-widest text-[#1C1730]/60 font-bold"><th className="p-5">Cell Name</th><th className="p-5">Avg Attendance</th><th className="p-5">Total Meetings</th><th className="p-5">Growth Trend</th></tr></thead><tbody className="divide-y divide-[#C8A24D]/10 bg-[#F6F1E4]">{cellStats.cellsArray.length === 0 ? (<tr><td colSpan={4} className="p-8 text-center text-[#1C1730]/50 font-plex italic">No cell groups found.</td></tr>) : (cellStats.cellsArray.map((cell: any, idx: number) => (<tr key={idx} className="hover:bg-[#C8A24D]/5 transition-colors"><td className="p-5 font-bold font-inter text-[#1C1730]">{cell.name}</td><td className="p-5 font-plex font-bold text-[#0B1330] text-lg">{cell.avg}</td><td className="p-5 font-plex text-[#1C1730]/70">{cell.count}</td><td className="p-5 font-plex font-bold">{cell.growth > 0 ? <span className="text-[#0B1330] flex items-center gap-1">+{cell.growth} <TrendingUp size={14} className="text-[#C8A24D]"/></span> : cell.growth < 0 ? <span className="text-[#6E1E2B]">{cell.growth}</span> : <span className="text-[#1C1730]/40">Stable</span>}</td></tr>)))}</tbody></table></div></div>
                 </>
             )}
           </div>
         )}
 
-        {/* --- 🔥 REGISTRATION FORM 🔥 --- */}
         {activeView === 'members' && (
           <div className="max-w-4xl mx-auto bg-[#F6F1E4] p-8 rounded-xl shadow-xl border border-[#C8A24D]/30 relative z-10">
-            <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] mb-6 transition-colors"><ArrowLeft size={16} /> Retreat to Dashboard</button>
-            <h2 className="text-3xl font-cormorant font-bold text-[#0B1330] mb-8 border-b-2 border-[#C8A24D]/20 pb-4">Entity Registration</h2>
+            <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] mb-6 transition-colors"><ArrowLeft size={16} /> Back to Dashboard</button>
+            <h2 className="text-3xl font-cormorant font-bold text-[#0B1330] mb-8 border-b-2 border-[#C8A24D]/20 pb-4">Registration Form</h2>
             
             <form onSubmit={handleSaveMember} className="flex flex-col gap-6 max-w-lg">
               <div className="bg-white p-5 rounded-lg border border-[#C8A24D]/40 shadow-sm border-l-4 border-l-[#C8A24D]">
-                <label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Clearance Profile (Status)</label>
+                <label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Registration Type / Status Profile</label>
                 <select value={memberStatus} onChange={(e) => setMemberStatus(e.target.value)} className="w-full border border-[#C8A24D]/30 rounded p-3 bg-[#F6F1E4] text-[#0B1330] font-bold font-inter outline-none focus:border-[#C8A24D] focus:ring-1 focus:ring-[#C8A24D]">
                   <option value="1st Timer">1st Timer</option>
                   <option value="2nd Timer">2nd Timer</option>
@@ -810,12 +647,12 @@ export default function App() {
                 </select>
               </div>
 
-              <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Full Identity</label><input type="text" required value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div>
+              <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Full Name</label><input type="text" required value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div>
               
               <div className="grid grid-cols-2 gap-6">
                 <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Gender</label><select value={gender} onChange={(e) => setGender(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]"><option value="">Select...</option><option value="Male">Male</option><option value="Female">Female</option></select></div>
                 <div>
-                  <label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Guarded Genesis (DOB)</label>
+                  <label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Birthday</label>
                   <div className="flex gap-2">
                     <select value={dobMonth} onChange={(e) => setDobMonth(e.target.value)} className="w-1/2 bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]"><option value="">Mo</option>{['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map(m => <option key={m} value={m}>{m.substring(0,3)}</option>)}</select>
                     <select value={dobDay} onChange={(e) => setDobDay(e.target.value)} className="w-1/2 bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]"><option value="">Day</option>{[...Array(31)].map((_, i) => <option key={i+1} value={i+1}>{i+1}</option>)}</select>
@@ -823,11 +660,11 @@ export default function App() {
                 </div>
               </div>
 
-              <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Vocation</label><input type="text" value={occupation} onChange={(e) => setOccupation(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div>
-              <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Comms Vector (Phone)</label><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-plex outline-none focus:border-[#C8A24D]" /></div>
+              <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Occupation</label><input type="text" value={occupation} onChange={(e) => setOccupation(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div>
+              <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Phone</label><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-plex outline-none focus:border-[#C8A24D]" /></div>
               
               <button type="submit" disabled={isSubmitting} className="bg-[#0B1330] text-[#C8A24D] px-4 py-4 rounded font-bold font-inter uppercase tracking-widest hover:bg-[#2F1B4D] shadow-lg transition-colors border border-[#0B1330] mt-4 disabled:opacity-50">
-                Commit to Ledger
+                Save Registration
               </button>
               
               {statusMessage && <div className={`p-4 rounded border font-inter font-bold text-sm ${statusMessage.includes('✅') ? 'bg-[#C8A24D]/10 text-[#0B1330] border-[#C8A24D]' : 'bg-[#6E1E2B]/10 text-[#6E1E2B] border-[#6E1E2B]'}`}>{statusMessage}</div>}
@@ -835,26 +672,25 @@ export default function App() {
           </div>
         )}
 
-        {/* --- 🔥 DYNAMIC MEMBER CHECK-IN 🔥 --- */}
         {activeView === 'attendance' && (
           <div className="max-w-4xl mx-auto bg-[#F6F1E4] p-8 rounded-xl shadow-xl border border-[#C8A24D]/30 relative z-10">
-            <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] mb-6 transition-colors"><ArrowLeft size={16} /> Retreat to Dashboard</button>
-            <div className="flex items-center gap-3 mb-8 border-b-2 border-[#C8A24D]/20 pb-4"><CheckSquare className="text-[#C8A24D]" size={32} /><h2 className="text-3xl font-cormorant font-bold text-[#0B1330]">Service Registry</h2></div>
+            <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] mb-6 transition-colors"><ArrowLeft size={16} /> Back to Dashboard</button>
+            <div className="flex items-center gap-3 mb-8 border-b-2 border-[#C8A24D]/20 pb-4"><CheckSquare className="text-[#C8A24D]" size={32} /><h2 className="text-3xl font-cormorant font-bold text-[#0B1330]">Service Check-In</h2></div>
             
             <div className="flex flex-col md:flex-row gap-6 mb-8">
-              <div className="flex-1"><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Temporal Index (Date)</label><input type="date" value={checkinDate} onChange={(e) => setCheckinDate(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div>
+              <div className="flex-1"><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Service Date</label><input type="date" value={checkinDate} onChange={(e) => setCheckinDate(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div>
               <div className="flex-[2]">
-                <label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Database Query</label>
+                <label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Search by Name or Phone</label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><Search size={18} className="text-[#C8A24D]" /></div>
-                  <input type="text" placeholder="Query by Identity or Vector (Phone)..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 pl-12 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" />
+                  <input type="text" placeholder="e.g. John Doe or 080..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 pl-12 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" />
                 </div>
               </div>
             </div>
             
             <div className="border border-[#C8A24D]/40 rounded-lg overflow-hidden mb-6 shadow-sm bg-white">
               <div className="bg-[#0B1330] p-4 font-bold text-[#F6F1E4] text-sm flex justify-between font-inter uppercase tracking-widest">
-                  <span>Congregation Roster</span><span className="text-[#C8A24D] font-plex">{selectedMembers.length} Flagged</span>
+                  <span>Congregation Roster</span><span className="text-[#C8A24D] font-plex">{selectedMembers.length} Selected</span>
               </div>
               <div className="max-h-[50vh] overflow-y-auto p-2 bg-[#F6F1E4]">
                 {memberList.filter(m => m.full_name.toLowerCase().includes(searchTerm.toLowerCase()) || (m.phone_number && m.phone_number.includes(searchTerm))).map((m, idx) => (
@@ -862,7 +698,7 @@ export default function App() {
                     <input type="checkbox" checked={selectedMembers.includes(m.id)} onChange={() => toggleMemberSelection(m.id)} className="w-6 h-6 mt-0.5 text-[#0B1330] rounded border-[#C8A24D]/40 focus:ring-[#C8A24D]" />
                     <div className="flex flex-col">
                         <span className="text-[#1C1730] font-bold font-inter text-lg">{m.full_name}</span>
-                        <span className="text-[#1C1730]/50 text-sm font-plex">{m.phone_number || 'No vector on file'}</span>
+                        <span className="text-[#1C1730]/50 text-sm font-plex">{m.phone_number || 'No phone number on file'}</span>
                     </div>
                   </label>
                 ))}
@@ -870,7 +706,7 @@ export default function App() {
             </div>
             
             <button onClick={handleSaveCheckins} disabled={isSubmitting || memberList.length === 0} className="w-full md:w-auto bg-[#C8A24D] text-[#0B1330] px-10 py-4 rounded font-bold font-inter uppercase tracking-widest text-lg disabled:opacity-50 shadow-lg hover:bg-[#b59040] transition-colors">
-                {isSubmitting ? 'Verifying...' : 'Commit Registry'}
+                {isSubmitting ? 'Verifying...' : 'Save Attendance'}
             </button>
             
             {checkinStatusMessage && (
@@ -881,44 +717,42 @@ export default function App() {
           </div>
         )}
 
-        {/* --- 🔥 CELL LOG 🔥 --- */}
         {activeView === 'cell_log' && (
           <div className="max-w-4xl mx-auto bg-[#F6F1E4] p-8 rounded-xl shadow-xl border border-[#C8A24D]/30 relative z-10">
-            <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] mb-6 transition-colors"><ArrowLeft size={16} /> Retreat to Dashboard</button>
-            <div className="flex items-center gap-3 mb-8 border-b-2 border-[#C8A24D]/20 pb-4"><Home className="text-[#C8A24D]" size={32} /><h2 className="text-3xl font-cormorant font-bold text-[#0B1330]">Sector Report (Cells)</h2></div>
+            <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] mb-6 transition-colors"><ArrowLeft size={16} /> Back to Dashboard</button>
+            <div className="flex items-center gap-3 mb-8 border-b-2 border-[#C8A24D]/20 pb-4"><Home className="text-[#C8A24D]" size={32} /><h2 className="text-3xl font-cormorant font-bold text-[#0B1330]">Cell Meeting Report</h2></div>
             
             <form onSubmit={handleSaveCellMeeting} className="flex flex-col gap-6 max-w-lg">
-              <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Sector Designation</label><input type="text" required value={cellName} onChange={(e) => setCellName(e.target.value)} placeholder="e.g. Grace Fellowship - Downtown" className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div>
+              <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Cell Group Name</label><input type="text" required value={cellName} onChange={(e) => setCellName(e.target.value)} placeholder="e.g. Grace Fellowship - Downtown" className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div>
               <div className="grid grid-cols-2 gap-6">
-                  <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Overseer Identity</label><input type="text" required value={cellLeader} onChange={(e) => setCellLeader(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div>
-                  <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Total Volume</label><input type="number" required min="1" value={cellAttendance} onChange={(e) => setCellAttendance(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-plex outline-none focus:border-[#C8A24D]" /></div>
+                  <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Leader Name</label><input type="text" required value={cellLeader} onChange={(e) => setCellLeader(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div>
+                  <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Attendance</label><input type="number" required min="1" value={cellAttendance} onChange={(e) => setCellAttendance(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-plex outline-none focus:border-[#C8A24D]" /></div>
               </div>
-              <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Temporal Index</label><input type="date" required value={cellDate} onChange={(e) => setCellDate(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div>
-              <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Operational Notes</label><textarea rows={4} value={cellNotes} onChange={(e) => setCellNotes(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div>
-              <button type="submit" disabled={isSubmitting} className="bg-[#0B1330] text-[#C8A24D] px-4 py-4 rounded font-bold font-inter uppercase tracking-widest hover:bg-[#2F1B4D] shadow-lg transition-colors border border-[#0B1330] mt-4 disabled:opacity-50">Commit Report</button>
+              <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Meeting Date</label><input type="date" required value={cellDate} onChange={(e) => setCellDate(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div>
+              <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Notes / Testimonies</label><textarea rows={4} value={cellNotes} onChange={(e) => setCellNotes(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div>
+              <button type="submit" disabled={isSubmitting} className="bg-[#0B1330] text-[#C8A24D] px-4 py-4 rounded font-bold font-inter uppercase tracking-widest hover:bg-[#2F1B4D] shadow-lg transition-colors border border-[#0B1330] mt-4 disabled:opacity-50">Submit Report</button>
               {cellStatusMessage && <div className={`p-4 rounded border font-inter font-bold text-sm ${cellStatusMessage.includes('✅') ? 'bg-[#C8A24D]/10 text-[#0B1330] border-[#C8A24D]' : 'bg-[#6E1E2B]/10 text-[#6E1E2B] border-[#6E1E2B]'}`}>{cellStatusMessage}</div>}
             </form>
           </div>
         )}
 
-        {/* --- 🔥 RADAR TRIAGE (ABSENTEES) 🔥 --- */}
         {activeView === 'absentees' && isAdmin && (
           <div className="max-w-6xl mx-auto space-y-6 relative z-10">
-            <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] transition-colors"><ArrowLeft size={16} /> Retreat to Dashboard</button>
+            <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] transition-colors"><ArrowLeft size={16} /> Back to Dashboard</button>
             <div className="bg-[#F6F1E4] rounded-xl shadow-xl border border-[#C8A24D]/30 overflow-hidden">
                 <div className="bg-[#0B1330] p-6 border-b-2 border-[#C8A24D]">
-                    <h3 className="text-2xl font-cormorant font-bold text-[#F6F1E4] flex items-center gap-3"><UserMinus className="text-[#6E1E2B]"/> Radar Triage Protocol</h3>
+                    <h3 className="text-2xl font-cormorant font-bold text-[#F6F1E4] flex items-center gap-3"><UserMinus className="text-[#6E1E2B]"/> Smart Absentee Radar Triage</h3>
                 </div>
                 <div className="p-0">
                     <table className="w-full text-left border-collapse">
-                        <thead><tr className="bg-white border-b border-[#C8A24D]/20 text-xs font-inter uppercase tracking-widest text-[#1C1730]/60 font-bold"><th className="p-5">Identity</th><th className="p-5">Threat Level</th><th className="p-5">Cycles Missed</th><th className="p-5">Action</th></tr></thead>
+                        <thead><tr className="bg-white border-b border-[#C8A24D]/20 text-xs font-inter uppercase tracking-widest text-[#1C1730]/60 font-bold"><th className="p-5">Member</th><th className="p-5">Triage Status</th><th className="p-5">Missed Count</th><th className="p-5">Action</th></tr></thead>
                         <tbody className="divide-y divide-[#C8A24D]/10 bg-[#F6F1E4]">
                             {absenteeList.map((person, idx) => (
                                 <tr key={idx} className="hover:bg-white transition-colors">
                                     <td className="p-5 font-bold text-[#1C1730] font-inter text-lg">{person.full_name}</td>
                                     <td className="p-5"><span className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest border rounded ${person.colorClass}`}>{person.alertLevel}</span></td>
                                     <td className="p-5 font-plex font-bold text-[#0B1330] text-lg">{person.missedCount}</td>
-                                    <td className="p-5"><button onClick={() => handleSendMessage(person.phone_number, person.full_name, 'whatsapp', 'checking_in')} className="bg-[#0B1330] text-[#C8A24D] px-4 py-2 rounded font-bold font-inter text-xs tracking-wide hover:bg-[#2F1B4D] shadow">DISPATCH</button></td>
+                                    <td className="p-5"><button onClick={() => handleSendMessage(person.phone_number, person.full_name, 'whatsapp', 'checking_in')} className="bg-[#0B1330] text-[#C8A24D] px-4 py-2 rounded font-bold font-inter text-xs tracking-wide hover:bg-[#2F1B4D] shadow">Message</button></td>
                                 </tr>
                             ))}
                         </tbody>
@@ -928,23 +762,22 @@ export default function App() {
           </div>
         )}
 
-        {/* --- 🔥 BIRTHDAY DASHBOARD 🔥 --- */}
         {activeView === 'birthdays' && isAdmin && (
           <div className="max-w-4xl mx-auto space-y-6 relative z-10">
-            <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] transition-colors"><ArrowLeft size={16} /> Retreat to Dashboard</button>
+            <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] transition-colors"><ArrowLeft size={16} /> Back to Dashboard</button>
             <div className="bg-[#F6F1E4] rounded-xl shadow-xl border border-[#C8A24D]/30 overflow-hidden">
                 <div className="bg-[#0B1330] p-6 border-b-2 border-[#C8A24D]">
-                    <h3 className="text-2xl font-cormorant font-bold text-[#F6F1E4] flex items-center gap-3"><Gift className="text-[#C8A24D]"/> Temporal Milestones (Birthdays)</h3>
+                    <h3 className="text-2xl font-cormorant font-bold text-[#F6F1E4] flex items-center gap-3"><Gift className="text-[#C8A24D]"/> Birthday Management</h3>
                 </div>
                 <div className="p-4 bg-white/50 border-b border-[#C8A24D]/20">
-                    <h4 className="font-bold text-[#1C1730] font-inter tracking-widest uppercase text-xs">Immediate Requirements (Today)</h4>
+                    <h4 className="font-bold text-[#1C1730] font-inter tracking-widest uppercase text-xs">Today's Birthdays</h4>
                 </div>
                 <div className="bg-[#F6F1E4]">
                     {birthdaysToday.length === 0 ? <div className="p-6 text-center font-plex text-[#1C1730]/50 italic">None logged.</div> : birthdaysToday.map((p, idx) => <BirthdayRow key={idx} person={p} />)}
                 </div>
                 
                 <div className="p-4 bg-white/50 border-b border-[#C8A24D]/20 border-t border-[#C8A24D]/40">
-                    <h4 className="font-bold text-[#1C1730] font-inter tracking-widest uppercase text-xs">Upcoming Requirements (7 Days)</h4>
+                    <h4 className="font-bold text-[#1C1730] font-inter tracking-widest uppercase text-xs">This Week's Birthdays</h4>
                 </div>
                 <div className="bg-[#F6F1E4]">
                     {birthdaysWeek.length === 0 ? <div className="p-6 text-center font-plex text-[#1C1730]/50 italic">None logged.</div> : birthdaysWeek.map((p, idx) => <BirthdayRow key={idx} person={p} />)}
@@ -953,17 +786,16 @@ export default function App() {
           </div>
         )}
 
-        {/* --- 🔥 GUEST ROSTER 🔥 --- */}
         {activeView === 'guests' && isAdmin && (
           <div className="max-w-6xl mx-auto space-y-6 relative z-10">
-            <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] transition-colors"><ArrowLeft size={16} /> Retreat to Dashboard</button>
+            <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] transition-colors"><ArrowLeft size={16} /> Back to Dashboard</button>
             <div className="bg-[#F6F1E4] rounded-xl shadow-xl border border-[#C8A24D]/30 overflow-hidden">
                 <div className="bg-[#0B1330] p-6 border-b-2 border-[#C8A24D]">
-                    <h3 className="text-2xl font-cormorant font-bold text-[#F6F1E4] flex items-center gap-3"><ClipboardList className="text-[#C8A24D]"/> Primary Acquisitions (Guests)</h3>
+                    <h3 className="text-2xl font-cormorant font-bold text-[#F6F1E4] flex items-center gap-3"><ClipboardList className="text-[#C8A24D]"/> Guest Follow-Up Roster</h3>
                 </div>
                 <div className="p-0">
                     <table className="w-full text-left border-collapse">
-                        <thead><tr className="bg-white border-b border-[#C8A24D]/20 text-xs font-inter uppercase tracking-widest text-[#1C1730]/60 font-bold"><th className="p-5">Identity</th><th className="p-5">Clearance</th><th className="p-5">Vector</th></tr></thead>
+                        <thead><tr className="bg-white border-b border-[#C8A24D]/20 text-xs font-inter uppercase tracking-widest text-[#1C1730]/60 font-bold"><th className="p-5">Member</th><th className="p-5">Status</th><th className="p-5">Phone</th></tr></thead>
                         <tbody className="divide-y divide-[#C8A24D]/10 bg-[#F6F1E4]">
                             {guestList.map((g, i) => (
                                 <tr key={i} className="hover:bg-white transition-colors">
