@@ -8,7 +8,7 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // --- DESIGN SYSTEM: OFFICIAL LOGO ---
-const GraceCrest = ({ className = "w-8 h-8", opacity = 1 }) => (
+const GraceCrest = ({ className = "h-16 w-auto", opacity = 1 }) => (
   <img 
     src="https://tijlitzryjdhfebpjrao.supabase.co/storage/v1/object/public/Assets/WHITE.png" 
     alt="Grace Citadel Int'l Logo" 
@@ -369,7 +369,8 @@ export default function App() {
         <GraceCrest className="absolute w-[150vw] h-[150vw] -right-[30vw] -bottom-[30vw] pointer-events-none" opacity={0.03} />
         
         <div className="bg-[#F6F1E4] p-10 rounded-2xl shadow-2xl max-w-md w-full border border-[#C8A24D]/30 relative z-10">
-          <div className="flex justify-center mb-6"><GraceCrest className="w-48 h-48" opacity={1} /></div>
+          <div className="flex justify-center mb-4"><GraceCrest className="h-28 w-auto" opacity={1} /></div>
+          <h1 className="text-3xl font-cinzel font-bold text-center text-[#0B1330] mb-6 tracking-wide">Grace Citadel</h1>
           <form onSubmit={handleLogin} className="space-y-5">
             <div><label className="block text-sm font-bold text-[#1C1730] mb-1 font-inter">Email</label><input type="email" required value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} className="w-full bg-white border border-[#C8A24D]/40 rounded-md p-3 focus:border-[#C8A24D] focus:ring-1 focus:ring-[#C8A24D] outline-none text-[#1C1730] font-inter" /></div>
             <div><label className="block text-sm font-bold text-[#1C1730] mb-1 font-inter">Password</label><input type="password" required value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} className="w-full bg-white border border-[#C8A24D]/40 rounded-md p-3 focus:border-[#C8A24D] focus:ring-1 focus:ring-[#C8A24D] outline-none text-[#1C1730] font-inter" /></div>
@@ -398,7 +399,10 @@ export default function App() {
 
       <header className="bg-[#0B1330] border-b-2 border-[#C8A24D] px-6 py-4 flex items-center justify-between shadow-md relative z-20">
         <div className="flex items-center gap-4 cursor-pointer group" onClick={() => setActiveView('dashboard')}>
-          <GraceCrest className="w-24 h-24 transform group-hover:scale-105 transition-transform" />
+          <GraceCrest className="h-14 w-auto transform group-hover:scale-105 transition-transform" />
+          <div>
+            <h1 className="text-2xl font-cinzel font-bold text-[#C8A24D] tracking-wide leading-none">Grace Citadel</h1>
+          </div>
         </div>
         <div className="flex items-center gap-4">
             <span className="text-[#F6F1E4]/70 font-plex text-xs hidden md:inline">
