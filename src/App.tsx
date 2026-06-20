@@ -89,9 +89,11 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // --- 🔥 ROLE CLEARANCE LOGIC 🔥 ---
   const userEmail = session?.user?.email?.toLowerCase() || '';
   const isUsher = userEmail.includes('usher');
-  const isAdmin = !isUsher;
+  const isCellLeader = userEmail.includes('leader') || userEmail.includes('cell');
+  const isAdmin = !isUsher && !isCellLeader;
 
   useEffect(() => {
     if (session && isAdmin) {
@@ -102,11 +104,11 @@ export default function App() {
         if (activeView === 'analytics') { fetchAnalytics(); setSelectedMonthData(null); setAnalyticsTab('service'); }
         if (activeView === 'tasks') { fetchBirthdays(); fetchCrmTasks(); fetchAbsentees(); }
     }
-    if (session && activeView === 'attendance') {
+    if (session && activeView === 'attendance' && !isCellLeader) {
       fetchMembersForCheckin();
       setSelectedMembers([]); setCheckinStatusMessage(''); setSearchTerm('');
     }
-  }, [session, activeView, isAdmin]);
+  }, [session, activeView, isAdmin, isCellLeader]);
 
   const fetchBirthdays = async () => {
     const { data } = await supabase.from('members').select('full_name, date_of_birth, phone_number');
@@ -367,8 +369,7 @@ export default function App() {
         <GraceCrest className="absolute w-[150vw] h-[150vw] -right-[30vw] -bottom-[30vw] pointer-events-none" opacity={0.03} />
         
         <div className="bg-[#F6F1E4] p-10 rounded-2xl shadow-2xl max-w-md w-full border border-[#C8A24D]/30 relative z-10">
-          <div className="flex justify-center mb-6"><GraceCrest className="w-24 h-24" opacity={1} /></div>
-          <h1 className="text-3xl font-cinzel font-bold text-center text-[#0B1330] mb-2 tracking-wide">Grace Citadel</h1>
+          <div className="flex justify-center mb-6"><GraceCrest className="w-48 h-48" opacity={1} /></div>
           <form onSubmit={handleLogin} className="space-y-5">
             <div><label className="block text-sm font-bold text-[#1C1730] mb-1 font-inter">Email</label><input type="email" required value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} className="w-full bg-white border border-[#C8A24D]/40 rounded-md p-3 focus:border-[#C8A24D] focus:ring-1 focus:ring-[#C8A24D] outline-none text-[#1C1730] font-inter" /></div>
             <div><label className="block text-sm font-bold text-[#1C1730] mb-1 font-inter">Password</label><input type="password" required value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} className="w-full bg-white border border-[#C8A24D]/40 rounded-md p-3 focus:border-[#C8A24D] focus:ring-1 focus:ring-[#C8A24D] outline-none text-[#1C1730] font-inter" /></div>
@@ -397,12 +398,12 @@ export default function App() {
 
       <header className="bg-[#0B1330] border-b-2 border-[#C8A24D] px-6 py-4 flex items-center justify-between shadow-md relative z-20">
         <div className="flex items-center gap-4 cursor-pointer group" onClick={() => setActiveView('dashboard')}>
-      <GraceCrest className="w-28 h-28 transform group-hover:scale-105 transition-transform" />
-          <div>
-            <h1 className="text-2xl font-cinzel font-bold text-[#C8A24D] tracking-wide leading-none">Grace Citadel</h1>
-          </div>
+          <GraceCrest className="w-24 h-24 transform group-hover:scale-105 transition-transform" />
         </div>
         <div className="flex items-center gap-4">
+            <span className="text-[#F6F1E4]/70 font-plex text-xs hidden md:inline">
+                {isAdmin ? 'ADMIN CLEARANCE' : isCellLeader ? 'CELL LEADER PORTAL' : 'USHER PORTAL'}
+            </span>
             <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2 text-sm border border-[#C8A24D]/30 text-[#C8A24D] rounded-md hover:bg-[#2F1B4D] hover:border-[#C8A24D] font-bold transition-colors">
                 <LogOut size={16} /> Exit
             </button>
@@ -415,14 +416,20 @@ export default function App() {
         {activeView === 'dashboard' && (
           <div className="max-w-7xl mx-auto space-y-6 relative z-10">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <div className="bg-[#F6F1E4] p-6 rounded-xl shadow-sm border border-[#C8A24D]/20 hover:shadow-md hover:border-[#C8A24D]/50 transition-all cursor-pointer group" onClick={() => setActiveView('attendance')}>
-                  <h2 className="text-2xl font-cormorant font-bold mb-2 text-[#0B1330] flex items-center gap-3"><CheckSquare size={22} className="text-[#C8A24D]"/> Service Check-In</h2>
-                  <p className="text-[#1C1730]/70 text-sm font-inter">Log weekend service attendance roster.</p>
-              </div>
-              <div className="bg-[#F6F1E4] p-6 rounded-xl shadow-sm border border-[#C8A24D]/20 hover:shadow-md hover:border-[#C8A24D]/50 transition-all cursor-pointer group" onClick={() => {setActiveView('members'); setStatusMessage('');}}>
-                  <h2 className="text-2xl font-cormorant font-bold mb-2 text-[#0B1330] flex items-center gap-3"><UserPlus size={22} className="text-[#C8A24D]"/> Registration Form</h2>
-                  <p className="text-[#1C1730]/70 text-sm font-inter">Register new members and 1st timers.</p>
-              </div>
+              
+              {!isCellLeader && (
+                <>
+                  <div className="bg-[#F6F1E4] p-6 rounded-xl shadow-sm border border-[#C8A24D]/20 hover:shadow-md hover:border-[#C8A24D]/50 transition-all cursor-pointer group" onClick={() => setActiveView('attendance')}>
+                      <h2 className="text-2xl font-cormorant font-bold mb-2 text-[#0B1330] flex items-center gap-3"><CheckSquare size={22} className="text-[#C8A24D]"/> Service Check-In</h2>
+                      <p className="text-[#1C1730]/70 text-sm font-inter">Log weekend service attendance roster.</p>
+                  </div>
+                  <div className="bg-[#F6F1E4] p-6 rounded-xl shadow-sm border border-[#C8A24D]/20 hover:shadow-md hover:border-[#C8A24D]/50 transition-all cursor-pointer group" onClick={() => {setActiveView('members'); setStatusMessage('');}}>
+                      <h2 className="text-2xl font-cormorant font-bold mb-2 text-[#0B1330] flex items-center gap-3"><UserPlus size={22} className="text-[#C8A24D]"/> Registration Form</h2>
+                      <p className="text-[#1C1730]/70 text-sm font-inter">Register new members and 1st timers.</p>
+                  </div>
+                </>
+              )}
+
               <div className="bg-[#F6F1E4] p-6 rounded-xl shadow-sm border border-[#C8A24D]/20 hover:shadow-md hover:border-[#C8A24D]/50 transition-all cursor-pointer group" onClick={() => {setActiveView('cell_log'); setCellStatusMessage('');}}>
                   <h2 className="text-2xl font-cormorant font-bold mb-2 text-[#0B1330] flex items-center gap-3"><Home size={22} className="text-[#C8A24D]"/> Cell Meeting Log</h2>
                   <p className="text-[#1C1730]/70 text-sm font-inter">Record weekly mid-week fellowship data.</p>
@@ -631,7 +638,7 @@ export default function App() {
           </div>
         )}
 
-        {activeView === 'members' && (
+        {!isCellLeader && activeView === 'members' && (
           <div className="max-w-4xl mx-auto bg-[#F6F1E4] p-8 rounded-xl shadow-xl border border-[#C8A24D]/30 relative z-10">
             <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] mb-6 transition-colors"><ArrowLeft size={16} /> Back to Dashboard</button>
             <h2 className="text-3xl font-cormorant font-bold text-[#0B1330] mb-8 border-b-2 border-[#C8A24D]/20 pb-4">Registration Form</h2>
@@ -672,7 +679,7 @@ export default function App() {
           </div>
         )}
 
-        {activeView === 'attendance' && (
+        {!isCellLeader && activeView === 'attendance' && (
           <div className="max-w-4xl mx-auto bg-[#F6F1E4] p-8 rounded-xl shadow-xl border border-[#C8A24D]/30 relative z-10">
             <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] mb-6 transition-colors"><ArrowLeft size={16} /> Back to Dashboard</button>
             <div className="flex items-center gap-3 mb-8 border-b-2 border-[#C8A24D]/20 pb-4"><CheckSquare className="text-[#C8A24D]" size={32} /><h2 className="text-3xl font-cormorant font-bold text-[#0B1330]">Service Check-In</h2></div>
