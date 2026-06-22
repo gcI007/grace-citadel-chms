@@ -147,22 +147,7 @@ export default function App() {
   const fetchMembersForCheckin = async () => { const { data } = await supabase.from('members').select('id, full_name, phone_number').order('full_name'); if (data) setMemberList(data); };
   
   // --- 🔥 NEW: GUEST TIMELINE LOGIC 🔥 ---
-  const fetchGuests = async () => { 
-      const { data: guests } = await supabase.from('members').select('*').in('status', ['1st Timer', '2nd Timer']).order('created_at', { ascending: false }); 
-      if (guests && guests.length > 0) { 
-          const names = guests.map(g => g.full_name);
-          const { data: checkins } = await supabase.from('member_checkins').select('service_date, member_name').in('member_name', names);
-          
-          const enrichedGuests = guests.map(g => {
-              const myCheckins = checkins?.filter(c => c.member_name === g.full_name).map(c => c.service_date).sort() || [];
-              return { ...g, firstVisit: myCheckins[0] || null, secondVisit: myCheckins[1] || null };
-          });
-          setGuestList(enrichedGuests); 
-      } else {
-          setGuestList([]);
-      }
-  };
-  
+   
   const fetchAnalytics = async () => { 
     const { data: checkins } = await supabase.from('member_checkins').select('*'); 
     if (checkins) { 
