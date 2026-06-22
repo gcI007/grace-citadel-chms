@@ -24,7 +24,9 @@ const TEMPLATES = {
   checking_in: "Hello {name}, just checking in on you from Grace Citadel! We haven't seen you in a little while and wanted to make sure everything is okay. Let us know how we can pray for you.",
   birthday: "Happy Birthday {name}! Grace Citadel celebrates you today. We pray this year brings you abundant joy, health, and favor!",
   bulk_student: "Greetings Students! This is a special update from Grace Citadel concerning our upcoming youth/campus fellowship. See you there!",
-  bulk_men: "Greetings Men of Honor! This is a direct update from the Grace Citadel Men's Fellowship regarding our upcoming gathering."
+  bulk_men: "Greetings Men of Honor! This is a direct update from the Grace Citadel Men's Fellowship regarding our upcoming gathering.",
+  bulk_present: "Hello {name}, it was wonderful fellowshipping with you at our last service! Have a blessed and highly favored week ahead.",
+  bulk_absent: "Hello {name}, we really missed your presence at our last gathering! We hope you are doing well and look forward to fellowshipping with you soon."
 };
 
 export default function App() {
@@ -251,16 +253,28 @@ export default function App() {
     else window.open(`sms:${cleanPhone}?body=${encodeURIComponent(message)}`, '_blank');
   };
 
+  // --- 🔥 NEW: BULK ATTENDANCE LOGIC 🔥 ---
   const prepareBulkQueue = async () => {
     setIsSubmitting(true);
     const { data: targets } = await supabase.from('members').select('full_name, phone_number, gender, status, occupation');
+    const { data: checkins } = await supabase.from('member_checkins').select('service_date, member_name');
     setIsSubmitting(false);
+
     if (!targets || targets.length === 0) return alert('No members found.');
+
+    let presentNames: string[] = [];
+    if (checkins && checkins.length > 0) {
+        const sortedDates = [...new Set(checkins.map(c => c.service_date))].sort();
+        const lastDate = sortedDates[sortedDates.length - 1]; // Finds the most recently logged service
+        presentNames = checkins.filter(c => c.service_date === lastDate).map(c => c.member_name);
+    }
 
     let filtered = targets;
     if (bulkGroup === 'Student') filtered = targets.filter(m => m.status === 'Student' || m.occupation?.toLowerCase().includes('student'));
     if (bulkGroup === 'Men') filtered = targets.filter(m => m.gender === 'Male');
     if (bulkGroup === 'Women') filtered = targets.filter(m => m.gender === 'Female');
+    if (bulkGroup === 'Present') filtered = targets.filter(m => presentNames.includes(m.full_name));
+    if (bulkGroup === 'Absent') filtered = targets.filter(m => !presentNames.includes(m.full_name));
 
     const queue = filtered.filter(m => m.phone_number).map(m => ({ name: m.full_name, phone: m.phone_number as string }));
     if (queue.length === 0) return alert('No valid phone numbers found for this group.');
@@ -279,14 +293,28 @@ export default function App() {
 
   const handleSendBulkSMS = async () => {
     setIsSubmitting(true);
-    const { data: targets } = await supabase.from('members').select('phone_number, gender, status, occupation');
+    const { data: targets } = await supabase.from('members').select('full_name, phone_number, gender, status, occupation');
+    const { data: checkins } = await supabase.from('member_checkins').select('service_date, member_name');
+    
     if (!targets || targets.length === 0) { setIsSubmitting(false); return alert('No members found.'); }
+
+    let presentNames: string[] = [];
+    if (checkins && checkins.length > 0) {
+        const sortedDates = [...new Set(checkins.map(c => c.service_date))].sort();
+        const lastDate = sortedDates[sortedDates.length - 1];
+        presentNames = checkins.filter(c => c.service_date === lastDate).map(c => c.member_name);
+    }
+
     let filtered = targets;
     if (bulkGroup === 'Student') filtered = targets.filter(m => m.status === 'Student' || m.occupation?.toLowerCase().includes('student'));
     if (bulkGroup === 'Men') filtered = targets.filter(m => m.gender === 'Male');
     if (bulkGroup === 'Women') filtered = targets.filter(m => m.gender === 'Female');
+    if (bulkGroup === 'Present') filtered = targets.filter(m => presentNames.includes(m.full_name));
+    if (bulkGroup === 'Absent') filtered = targets.filter(m => !presentNames.includes(m.full_name));
+
     const phones = filtered.map(m => m.phone_number).filter(p => p !== null) as string[];
     if (phones.length === 0) { setIsSubmitting(false); return alert('No valid phone numbers found for this group.'); }
+    
     const cleanPhones = phones.map(p => p.replace(/\D/g, ''));
     window.open(`sms:${cleanPhones.join(navigator.userAgent.includes('Mac') ? ',' : ';')}?body=${encodeURIComponent(bulkText)}`, '_blank');
     setIsSubmitting(false);
@@ -381,7 +409,6 @@ export default function App() {
         
         <div className="bg-[#F6F1E4] p-10 rounded-2xl shadow-2xl max-w-md w-full border border-[#C8A24D]/30 relative z-10">
           <div className="flex justify-center mb-4"><GraceCrest className="h-28 w-auto" opacity={1} /></div>
-          <h1 className="text-3xl font-cinzel font-bold text-center text-[#0B1330] mb-6 tracking-wide">Grace Citadel</h1>
           <form onSubmit={handleLogin} className="space-y-5">
             <div><label className="block text-sm font-bold text-[#1C1730] mb-1 font-inter">Email</label><input type="email" required value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} className="w-full bg-white border border-[#C8A24D]/40 rounded-md p-3 focus:border-[#C8A24D] focus:ring-1 focus:ring-[#C8A24D] outline-none text-[#1C1730] font-inter" /></div>
             <div><label className="block text-sm font-bold text-[#1C1730] mb-1 font-inter">Password</label><input type="password" required value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} className="w-full bg-white border border-[#C8A24D]/40 rounded-md p-3 focus:border-[#C8A24D] focus:ring-1 focus:ring-[#C8A24D] outline-none text-[#1C1730] font-inter" /></div>
@@ -411,9 +438,6 @@ export default function App() {
       <header className="bg-[#0B1330] border-b-2 border-[#C8A24D] px-6 py-4 flex items-center justify-between shadow-md relative z-20">
         <div className="flex items-center gap-4 cursor-pointer group" onClick={() => !isCellLeader && setActiveView('dashboard')}>
           <GraceCrest className="h-14 w-auto transform group-hover:scale-105 transition-transform" />
-          <div>
-            <h1 className="text-2xl font-cinzel font-bold text-[#C8A24D] tracking-wide leading-none">Grace Citadel</h1>
-          </div>
         </div>
         <div className="flex items-center gap-4">
             <span className="text-[#F6F1E4]/70 font-plex text-xs hidden md:inline">
@@ -589,11 +613,18 @@ export default function App() {
                         <div className="space-y-8 max-w-2xl">
                             <div>
                                 <label className="block text-sm font-bold font-inter text-[#0B1330] mb-3 uppercase tracking-widest">Target Segment</label>
-                                <div className="flex gap-4">
-                                    {['Student', 'Men', 'Women'].map(group => (
-                                        <label key={group} className={`flex items-center justify-center gap-2 border-2 px-6 py-4 rounded cursor-pointer select-none flex-1 transition-all ${bulkGroup === group ? 'border-[#C8A24D] bg-[#0B1330] text-[#C8A24D]' : 'border-[#C8A24D]/30 bg-white text-[#1C1730] hover:border-[#C8A24D]/60'}`}>
-                                            <input type="radio" checked={bulkGroup === group} onChange={() => {setBulkGroup(group); setBulkText(group === 'Student' ? TEMPLATES.bulk_student : TEMPLATES.bulk_men);}} className="hidden" />
-                                            <span className="font-bold font-inter">{group}</span>
+                                <div className="flex flex-wrap gap-4">
+                                    {['Student', 'Men', 'Women', 'Present', 'Absent'].map(group => (
+                                        <label key={group} className={`flex items-center justify-center gap-2 border-2 px-6 py-4 rounded cursor-pointer select-none flex-1 min-w-[140px] transition-all ${bulkGroup === group ? 'border-[#C8A24D] bg-[#0B1330] text-[#C8A24D]' : 'border-[#C8A24D]/30 bg-white text-[#1C1730] hover:border-[#C8A24D]/60'}`}>
+                                            <input type="radio" checked={bulkGroup === group} onChange={() => {
+                                                setBulkGroup(group); 
+                                                if(group === 'Student') setBulkText(TEMPLATES.bulk_student);
+                                                else if(group === 'Men') setBulkText(TEMPLATES.bulk_men);
+                                                else if(group === 'Women') setBulkText("Greetings Women of Grace! This is a special update regarding our upcoming gathering.");
+                                                else if(group === 'Present') setBulkText(TEMPLATES.bulk_present);
+                                                else if(group === 'Absent') setBulkText(TEMPLATES.bulk_absent);
+                                            }} className="hidden" />
+                                            <span className="font-bold font-inter whitespace-nowrap">{group}</span>
                                         </label>
                                     ))}
                                 </div>
@@ -658,111 +689,6 @@ export default function App() {
                     <div className="bg-[#F6F1E4] rounded-xl shadow-sm border border-[#C8A24D]/30 overflow-hidden"><div className="bg-[#0B1330] p-5 border-b border-[#C8A24D]/40"><h3 className="text-xl font-cormorant font-bold text-[#C8A24D] flex items-center gap-2"><Home size={20}/> Cell Group Leaderboard</h3></div><div className="overflow-x-auto"><table className="w-full text-left border-collapse"><thead><tr className="bg-white border-b border-[#C8A24D]/20 text-xs font-inter uppercase tracking-widest text-[#1C1730]/60 font-bold"><th className="p-5">Cell Name</th><th className="p-5">Avg Attendance</th><th className="p-5">Total Meetings</th><th className="p-5">Growth Trend</th></tr></thead><tbody className="divide-y divide-[#C8A24D]/10 bg-[#F6F1E4]">{cellStats.cellsArray.length === 0 ? (<tr><td colSpan={4} className="p-8 text-center text-[#1C1730]/50 font-plex italic">No cell groups found.</td></tr>) : (cellStats.cellsArray.map((cell: any, idx: number) => (<tr key={idx} className="hover:bg-[#C8A24D]/5 transition-colors"><td className="p-5 font-bold font-inter text-[#1C1730]">{cell.name}</td><td className="p-5 font-plex font-bold text-[#0B1330] text-lg">{cell.avg}</td><td className="p-5 font-plex text-[#1C1730]/70">{cell.count}</td><td className="p-5 font-plex font-bold">{cell.growth > 0 ? <span className="text-[#0B1330] flex items-center gap-1">+{cell.growth} <TrendingUp size={14} className="text-[#C8A24D]"/></span> : cell.growth < 0 ? <span className="text-[#6E1E2B]">{cell.growth}</span> : <span className="text-[#1C1730]/40">Stable</span>}</td></tr>)))}</tbody></table></div></div>
                 </>
             )}
-          </div>
-        )}
-
-        {!isCellLeader && activeView === 'members' && (
-          <div className="max-w-4xl mx-auto bg-[#F6F1E4] p-8 rounded-xl shadow-xl border border-[#C8A24D]/30 relative z-10">
-            <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] mb-6 transition-colors"><ArrowLeft size={16} /> Back to Dashboard</button>
-            <h2 className="text-3xl font-cormorant font-bold text-[#0B1330] mb-8 border-b-2 border-[#C8A24D]/20 pb-4">Registration Form</h2>
-            
-            <form onSubmit={handleSaveMember} className="flex flex-col gap-6 max-w-lg">
-              <div className="bg-white p-5 rounded-lg border border-[#C8A24D]/40 shadow-sm border-l-4 border-l-[#C8A24D]">
-                <label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Registration Type / Status Profile</label>
-                <select value={memberStatus} onChange={(e) => setMemberStatus(e.target.value)} className="w-full border border-[#C8A24D]/30 rounded p-3 bg-[#F6F1E4] text-[#0B1330] font-bold font-inter outline-none focus:border-[#C8A24D] focus:ring-1 focus:ring-[#C8A24D]">
-                  <option value="1st Timer">1st Timer</option>
-                  <option value="2nd Timer">2nd Timer</option>
-                  <option value="Student">Student Demographic</option>
-                  <option value="Regular">Regular Member</option>
-                </select>
-              </div>
-
-              <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Full Name</label><input type="text" required value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div>
-              
-              <div className="grid grid-cols-2 gap-6">
-                <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Gender</label><select value={gender} onChange={(e) => setGender(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]"><option value="">Select...</option><option value="Male">Male</option><option value="Female">Female</option></select></div>
-                <div>
-                  <label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Birthday</label>
-                  <div className="flex gap-2">
-                    <select value={dobMonth} onChange={(e) => setDobMonth(e.target.value)} className="w-1/2 bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]"><option value="">Mo</option>{['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map(m => <option key={m} value={m}>{m.substring(0,3)}</option>)}</select>
-                    <select value={dobDay} onChange={(e) => setDobDay(e.target.value)} className="w-1/2 bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]"><option value="">Day</option>{[...Array(31)].map((_, i) => <option key={i+1} value={i+1}>{i+1}</option>)}</select>
-                  </div>
-                </div>
-              </div>
-
-              <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Occupation</label><input type="text" value={occupation} onChange={(e) => setOccupation(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div>
-              <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Phone</label><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-plex outline-none focus:border-[#C8A24D]" /></div>
-              
-              <button type="submit" disabled={isSubmitting} className="bg-[#0B1330] text-[#C8A24D] px-4 py-4 rounded font-bold font-inter uppercase tracking-widest hover:bg-[#2F1B4D] shadow-lg transition-colors border border-[#0B1330] mt-4 disabled:opacity-50">
-                Save Registration
-              </button>
-              
-              {statusMessage && <div className={`p-4 rounded border font-inter font-bold text-sm ${statusMessage.includes('✅') ? 'bg-[#C8A24D]/10 text-[#0B1330] border-[#C8A24D]' : 'bg-[#6E1E2B]/10 text-[#6E1E2B] border-[#6E1E2B]'}`}>{statusMessage}</div>}
-            </form>
-          </div>
-        )}
-
-        {!isCellLeader && activeView === 'attendance' && (
-          <div className="max-w-4xl mx-auto bg-[#F6F1E4] p-8 rounded-xl shadow-xl border border-[#C8A24D]/30 relative z-10">
-            <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] mb-6 transition-colors"><ArrowLeft size={16} /> Back to Dashboard</button>
-            <div className="flex items-center gap-3 mb-8 border-b-2 border-[#C8A24D]/20 pb-4"><CheckSquare className="text-[#C8A24D]" size={32} /><h2 className="text-3xl font-cormorant font-bold text-[#0B1330]">Service Check-In</h2></div>
-            
-            <div className="flex flex-col md:flex-row gap-6 mb-8">
-              <div className="flex-1"><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Service Date</label><input type="date" value={checkinDate} onChange={(e) => setCheckinDate(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div>
-              <div className="flex-[2]">
-                <label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Search by Name or Phone</label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><Search size={18} className="text-[#C8A24D]" /></div>
-                  <input type="text" placeholder="e.g. John Doe or 080..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 pl-12 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" />
-                </div>
-              </div>
-            </div>
-            
-            <div className="border border-[#C8A24D]/40 rounded-lg overflow-hidden mb-6 shadow-sm bg-white">
-              <div className="bg-[#0B1330] p-4 font-bold text-[#F6F1E4] text-sm flex justify-between font-inter uppercase tracking-widest">
-                  <span>Congregation Roster</span><span className="text-[#C8A24D] font-plex">{selectedMembers.length} Selected</span>
-              </div>
-              <div className="max-h-[50vh] overflow-y-auto p-2 bg-[#F6F1E4]">
-                {memberList.filter(m => m.full_name.toLowerCase().includes(searchTerm.toLowerCase()) || (m.phone_number && m.phone_number.includes(searchTerm))).map((m, idx) => (
-                  <label key={m.id || idx} className="flex items-start gap-4 p-4 hover:bg-white rounded cursor-pointer border-b border-[#C8A24D]/10 last:border-0 transition-colors">
-                    <input type="checkbox" checked={selectedMembers.includes(m.id)} onChange={() => toggleMemberSelection(m.id)} className="w-6 h-6 mt-0.5 text-[#0B1330] rounded border-[#C8A24D]/40 focus:ring-[#C8A24D]" />
-                    <div className="flex flex-col">
-                        <span className="text-[#1C1730] font-bold font-inter text-lg">{m.full_name}</span>
-                        <span className="text-[#1C1730]/50 text-sm font-plex">{m.phone_number || 'No phone number on file'}</span>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </div>
-            
-            <button onClick={handleSaveCheckins} disabled={isSubmitting || memberList.length === 0} className="w-full md:w-auto bg-[#C8A24D] text-[#0B1330] px-10 py-4 rounded font-bold font-inter uppercase tracking-widest text-lg disabled:opacity-50 shadow-lg hover:bg-[#b59040] transition-colors">
-                {isSubmitting ? 'Verifying...' : 'Save Attendance'}
-            </button>
-            
-            {checkinStatusMessage && (
-                <div className={`p-4 rounded mt-6 text-sm font-bold font-inter border ${checkinStatusMessage.includes('✅') ? 'bg-[#C8A24D]/10 text-[#0B1330] border-[#C8A24D]' : checkinStatusMessage.includes('⚠️') ? 'bg-white text-[#0B1330] border-[#0B1330]' : 'bg-[#6E1E2B]/10 text-[#6E1E2B] border-[#6E1E2B]'}`}>
-                    {checkinStatusMessage}
-                </div>
-            )}
-          </div>
-        )}
-
-        {activeView === 'cell_log' && (
-          <div className="max-w-4xl mx-auto bg-[#F6F1E4] p-8 rounded-xl shadow-xl border border-[#C8A24D]/30 relative z-10">
-            {!isCellLeader && <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] mb-6 transition-colors"><ArrowLeft size={16} /> Back to Dashboard</button>}
-            <div className="flex items-center gap-3 mb-8 border-b-2 border-[#C8A24D]/20 pb-4"><Home className="text-[#C8A24D]" size={32} /><h2 className="text-3xl font-cormorant font-bold text-[#0B1330]">Cell Meeting Report</h2></div>
-            
-            <form onSubmit={handleSaveCellMeeting} className="flex flex-col gap-6 max-w-lg">
-              <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Cell Group Name</label><input type="text" required value={cellName} onChange={(e) => setCellName(e.target.value)} placeholder="e.g. Grace Fellowship - Downtown" className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div>
-              <div className="grid grid-cols-2 gap-6">
-                  <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Leader Name</label><input type="text" required value={cellLeader} onChange={(e) => setCellLeader(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div>
-                  <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Attendance</label><input type="number" required min="1" value={cellAttendance} onChange={(e) => setCellAttendance(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-plex outline-none focus:border-[#C8A24D]" /></div>
-              </div>
-              <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Meeting Date</label><input type="date" required value={cellDate} onChange={(e) => setCellDate(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div>
-              <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Notes / Testimonies</label><textarea rows={4} value={cellNotes} onChange={(e) => setCellNotes(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div>
-              <button type="submit" disabled={isSubmitting} className="bg-[#0B1330] text-[#C8A24D] px-4 py-4 rounded font-bold font-inter uppercase tracking-widest hover:bg-[#2F1B4D] shadow-lg transition-colors border border-[#0B1330] mt-4 disabled:opacity-50">Submit Report</button>
-              {cellStatusMessage && <div className={`p-4 rounded border font-inter font-bold text-sm ${cellStatusMessage.includes('✅') ? 'bg-[#C8A24D]/10 text-[#0B1330] border-[#C8A24D]' : 'bg-[#6E1E2B]/10 text-[#6E1E2B] border-[#6E1E2B]'}`}>{cellStatusMessage}</div>}
-            </form>
           </div>
         )}
 
