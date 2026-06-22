@@ -8,7 +8,7 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // --- DESIGN SYSTEM: OFFICIAL LOGO ---
-const GraceCrest = ({ className = "h-16 w-auto", opacity = 1 }) => (
+const GraceCrest = ({ className = "h-24 w-auto", opacity = 1 }) => (
   <img 
     src="https://tijlitzryjdhfebpjrao.supabase.co/storage/v1/object/public/Assets/WHITE.png" 
     alt="Grace Citadel Int'l Logo" 
@@ -146,8 +146,31 @@ export default function App() {
 
   const fetchMembersForCheckin = async () => { const { data } = await supabase.from('members').select('id, full_name, phone_number').order('full_name'); if (data) setMemberList(data); };
   
-  // --- 🔥 NEW: GUEST TIMELINE LOGIC 🔥 ---
-   
+  // --- 🔥 ULTIMATE FALLBACK FIX FOR GUESTS TIMELINE 🔥 ---
+  const fetchGuests = async () => { 
+      const { data: guests } = await supabase.from('members').select('*').in('status', ['1st Timer', '2nd Timer']).order('created_at', { ascending: false }); 
+      if (guests && guests.length > 0) { 
+          const names = guests.map(g => g.full_name);
+          const { data: checkins } = await supabase.from('member_checkins').select('service_date, member_name').in('member_name', names);
+          
+          const enrichedGuests = guests.map(g => {
+              const myCheckins = checkins?.filter(c => c.member_name === g.full_name).map(c => c.service_date).sort() || [];
+              
+              // HARD FALLBACK: If no check-in, force it to use the account creation date
+              const fallbackFirstVisit = g.created_at ? new Date(g.created_at).toISOString().split('T')[0] : null;
+              
+              return { 
+                  ...g, 
+                  firstVisit: myCheckins.length > 0 ? myCheckins[0] : fallbackFirstVisit, 
+                  secondVisit: myCheckins.length > 1 ? myCheckins[1] : null 
+              };
+          });
+          setGuestList(enrichedGuests); 
+      } else {
+          setGuestList([]);
+      }
+  };
+  
   const fetchAnalytics = async () => { 
     const { data: checkins } = await supabase.from('member_checkins').select('*'); 
     if (checkins) { 
@@ -461,7 +484,7 @@ export default function App() {
 
       <header className="bg-[#0B1330] border-b-2 border-[#C8A24D] px-6 py-4 flex items-center justify-between shadow-md relative z-20">
         <div className="flex items-center gap-4 cursor-pointer group" onClick={() => !isCellLeader && setActiveView('dashboard')}>
-          <GraceCrest className="h-14 w-auto transform group-hover:scale-105 transition-transform" />
+          <GraceCrest className="h-24 w-auto transform group-hover:scale-105 transition-transform" />
           <div>
             <h1 className="text-2xl font-cinzel font-bold text-[#C8A24D] tracking-wide leading-none">Grace Citadel</h1>
           </div>
@@ -909,8 +932,8 @@ export default function App() {
                                     <td className="p-5 font-inter text-sm text-[#0B1330] font-bold">{g.status}</td>
                                     <td className="p-5">
                                         <div className="flex flex-col gap-1">
-                                            <span className="text-xs font-bold font-inter text-[#1C1730]">1st: {g.firstVisit ? new Date(g.firstVisit).toLocaleDateString() : 'Unlogged'}</span>
-                                            {g.status === '2nd Timer' && <span className="text-xs font-bold font-inter text-[#C8A24D]">2nd: {g.secondVisit ? new Date(g.secondVisit).toLocaleDateString() : 'Unlogged'}</span>}
+                                            <span className="text-xs font-bold font-inter text-[#1C1730]">1st: {g.firstVisit ? new Date(g.firstVisit).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric'}) : 'Unlogged'}</span>
+                                            {g.status === '2nd Timer' && <span className="text-xs font-bold font-inter text-[#C8A24D]">2nd: {g.secondVisit ? new Date(g.secondVisit).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric'}) : 'Unlogged'}</span>}
                                         </div>
                                     </td>
                                     <td className="p-5 font-plex text-[#1C1730]">{g.phone_number || 'N/A'}</td>
