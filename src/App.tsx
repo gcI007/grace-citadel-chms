@@ -52,6 +52,7 @@ export default function App() {
   const [bulkText, setBulkText] = useState(TEMPLATES.bulk_student);
   const [bulkQueue, setBulkQueue] = useState<{ name: string; phone: string }[]>([]);
   const [bulkQueueIndex, setBulkQueueIndex] = useState(0);
+  const [bulkDate, setBulkDate] = useState(new Date().toISOString().split('T')[0]); // NEW: Bulk Date State
 
   const [monthlyChartData, setMonthlyChartData] = useState<any[]>([]);
   const [selectedMonthData, setSelectedMonthData] = useState<any | null>(null);
@@ -253,7 +254,6 @@ export default function App() {
     else window.open(`sms:${cleanPhone}?body=${encodeURIComponent(message)}`, '_blank');
   };
 
-  // --- 🔥 NEW: BULK ATTENDANCE LOGIC 🔥 ---
   const prepareBulkQueue = async () => {
     setIsSubmitting(true);
     const { data: targets } = await supabase.from('members').select('full_name, phone_number, gender, status, occupation');
@@ -263,10 +263,12 @@ export default function App() {
     if (!targets || targets.length === 0) return alert('No members found.');
 
     let presentNames: string[] = [];
-    if (checkins && checkins.length > 0) {
-        const sortedDates = [...new Set(checkins.map(c => c.service_date))].sort();
-        const lastDate = sortedDates[sortedDates.length - 1]; // Finds the most recently logged service
-        presentNames = checkins.filter(c => c.service_date === lastDate).map(c => c.member_name);
+    if (['Present', 'Absent'].includes(bulkGroup)) {
+        const hasCheckins = checkins?.some(c => c.service_date === bulkDate);
+        if (!hasCheckins) return alert(`⚠️ No attendance records found for ${bulkDate}. Please select a valid service date from the calendar.`);
+        if (checkins) {
+            presentNames = checkins.filter(c => c.service_date === bulkDate).map(c => c.member_name);
+        }
     }
 
     let filtered = targets;
@@ -277,7 +279,7 @@ export default function App() {
     if (bulkGroup === 'Absent') filtered = targets.filter(m => !presentNames.includes(m.full_name));
 
     const queue = filtered.filter(m => m.phone_number).map(m => ({ name: m.full_name, phone: m.phone_number as string }));
-    if (queue.length === 0) return alert('No valid phone numbers found for this group.');
+    if (queue.length === 0) return alert('No valid phone numbers found for this group on the selected date.');
     
     setBulkQueue(queue); setBulkQueueIndex(0);
   };
@@ -299,10 +301,12 @@ export default function App() {
     if (!targets || targets.length === 0) { setIsSubmitting(false); return alert('No members found.'); }
 
     let presentNames: string[] = [];
-    if (checkins && checkins.length > 0) {
-        const sortedDates = [...new Set(checkins.map(c => c.service_date))].sort();
-        const lastDate = sortedDates[sortedDates.length - 1];
-        presentNames = checkins.filter(c => c.service_date === lastDate).map(c => c.member_name);
+    if (['Present', 'Absent'].includes(bulkGroup)) {
+        const hasCheckins = checkins?.some(c => c.service_date === bulkDate);
+        if (!hasCheckins) { setIsSubmitting(false); return alert(`⚠️ No attendance records found for ${bulkDate}. Please select a valid service date from the calendar.`); }
+        if (checkins) {
+            presentNames = checkins.filter(c => c.service_date === bulkDate).map(c => c.member_name);
+        }
     }
 
     let filtered = targets;
@@ -313,7 +317,7 @@ export default function App() {
     if (bulkGroup === 'Absent') filtered = targets.filter(m => !presentNames.includes(m.full_name));
 
     const phones = filtered.map(m => m.phone_number).filter(p => p !== null) as string[];
-    if (phones.length === 0) { setIsSubmitting(false); return alert('No valid phone numbers found for this group.'); }
+    if (phones.length === 0) { setIsSubmitting(false); return alert('No valid phone numbers found for this group on the selected date.'); }
     
     const cleanPhones = phones.map(p => p.replace(/\D/g, ''));
     window.open(`sms:${cleanPhones.join(navigator.userAgent.includes('Mac') ? ',' : ';')}?body=${encodeURIComponent(bulkText)}`, '_blank');
@@ -409,6 +413,7 @@ export default function App() {
         
         <div className="bg-[#F6F1E4] p-10 rounded-2xl shadow-2xl max-w-md w-full border border-[#C8A24D]/30 relative z-10">
           <div className="flex justify-center mb-4"><GraceCrest className="h-28 w-auto" opacity={1} /></div>
+          <h1 className="text-3xl font-cinzel font-bold text-center text-[#0B1330] mb-6 tracking-wide">Grace Citadel</h1>
           <form onSubmit={handleLogin} className="space-y-5">
             <div><label className="block text-sm font-bold text-[#1C1730] mb-1 font-inter">Email</label><input type="email" required value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} className="w-full bg-white border border-[#C8A24D]/40 rounded-md p-3 focus:border-[#C8A24D] focus:ring-1 focus:ring-[#C8A24D] outline-none text-[#1C1730] font-inter" /></div>
             <div><label className="block text-sm font-bold text-[#1C1730] mb-1 font-inter">Password</label><input type="password" required value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} className="w-full bg-white border border-[#C8A24D]/40 rounded-md p-3 focus:border-[#C8A24D] focus:ring-1 focus:ring-[#C8A24D] outline-none text-[#1C1730] font-inter" /></div>
@@ -438,6 +443,9 @@ export default function App() {
       <header className="bg-[#0B1330] border-b-2 border-[#C8A24D] px-6 py-4 flex items-center justify-between shadow-md relative z-20">
         <div className="flex items-center gap-4 cursor-pointer group" onClick={() => !isCellLeader && setActiveView('dashboard')}>
           <GraceCrest className="h-14 w-auto transform group-hover:scale-105 transition-transform" />
+          <div>
+            <h1 className="text-2xl font-cinzel font-bold text-[#C8A24D] tracking-wide leading-none">Grace Citadel</h1>
+          </div>
         </div>
         <div className="flex items-center gap-4">
             <span className="text-[#F6F1E4]/70 font-plex text-xs hidden md:inline">
@@ -628,6 +636,16 @@ export default function App() {
                                         </label>
                                     ))}
                                 </div>
+
+                                {['Present', 'Absent'].includes(bulkGroup) && (
+                                    <div className="mt-4 p-4 bg-[#C8A24D]/10 border border-[#C8A24D]/30 rounded-lg flex items-center gap-4">
+                                        <CalendarDays className="text-[#0B1330]" size={24} />
+                                        <div className="flex-1">
+                                            <label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-1">Target Service Date</label>
+                                            <input type="date" value={bulkDate} onChange={(e) => setBulkDate(e.target.value)} className="w-full bg-white border border-[#C8A24D]/40 rounded p-2 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D] focus:ring-1 focus:ring-[#C8A24D] shadow-inner" />
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                             <div>
                                 <label className="block text-sm font-bold font-inter text-[#0B1330] mb-1 uppercase tracking-widest">Announcement Script</label>
