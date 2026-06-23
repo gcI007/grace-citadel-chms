@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, ArrowLeft, Sparkles, Lock, LogOut, Cake, CheckSquare, Search, UserPlus, ClipboardList, UserMinus, BarChart3, ShieldCheck, MessageCircle, MessageSquare, Phone, Heart, Gift, TrendingUp, CalendarDays, Share2, FileText, Home, Activity, History } from 'lucide-react';
+import { Users, ArrowLeft, Sparkles, Lock, LogOut, Cake, CheckSquare, Search, UserPlus, ClipboardList, UserMinus, BarChart3, ShieldCheck, MessageCircle, MessageSquare, Phone, Heart, Gift, TrendingUp, CalendarDays, Share2, FileText, Home, Activity, History, Mail } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
 // --- INITIALIZE SUPABASE ---
@@ -155,11 +155,7 @@ export default function App() {
           const enrichedGuests = guests.map(g => {
               const myCheckins = checkins?.filter(c => c.member_name === g.full_name).map(c => c.service_date).sort() || [];
               
-              let fallbackFirstVisit = null;
-              if (g.created_at) {
-                  const parsed = new Date(g.created_at);
-                  if (!isNaN(parsed.getTime())) fallbackFirstVisit = parsed.toISOString().split('T')[0];
-              }
+              const fallbackFirstVisit = g.created_at ? new Date(g.created_at).toISOString().split('T')[0] : null;
               
               return { 
                   ...g, 
@@ -306,7 +302,7 @@ export default function App() {
 
   const prepareBulkQueue = async () => {
     setIsSubmitting(true);
-    const { data: targets } = await supabase.from('members').select('full_name, phone_number, gender, status, occupation');
+    const { data: targets } = await supabase.from('members').select('full_name, phone_number, email, gender, status, occupation');
     const { data: checkins } = await supabase.from('member_checkins').select('service_date, member_name');
     setIsSubmitting(false);
 
@@ -345,7 +341,7 @@ export default function App() {
 
   const handleSendBulkSMS = async () => {
     setIsSubmitting(true);
-    const { data: targets } = await supabase.from('members').select('full_name, phone_number, gender, status, occupation');
+    const { data: targets } = await supabase.from('members').select('full_name, phone_number, email, gender, status, occupation');
     const { data: checkins } = await supabase.from('member_checkins').select('service_date, member_name');
     
     if (!targets || targets.length === 0) { setIsSubmitting(false); return alert('No members found.'); }
@@ -371,6 +367,41 @@ export default function App() {
     
     const cleanPhones = phones.map(p => p.replace(/\D/g, ''));
     window.open(`sms:${cleanPhones.join(navigator.userAgent.includes('Mac') ? ',' : ';')}?body=${encodeURIComponent(bulkText)}`, '_blank');
+    setIsSubmitting(false);
+  };
+
+  // --- 🔥 NEW: SEND BULK EMAIL LOGIC 🔥 ---
+  const handleSendBulkEmail = async () => {
+    setIsSubmitting(true);
+    const { data: targets } = await supabase.from('members').select('full_name, phone_number, email, gender, status, occupation');
+    const { data: checkins } = await supabase.from('member_checkins').select('service_date, member_name');
+    
+    if (!targets || targets.length === 0) { setIsSubmitting(false); return alert('No members found.'); }
+
+    let presentNames: string[] = [];
+    if (['Present', 'Absent'].includes(bulkGroup)) {
+        const hasCheckins = checkins?.some(c => c.service_date === bulkDate);
+        if (!hasCheckins) { setIsSubmitting(false); return alert(`⚠️ No attendance records found for ${bulkDate}. Please select a valid service date from the calendar.`); }
+        if (checkins) {
+            presentNames = checkins.filter(c => c.service_date === bulkDate).map(c => c.member_name);
+        }
+    }
+
+    let filtered = targets;
+    if (bulkGroup === 'Student') filtered = targets.filter(m => m.status === 'Student' || m.occupation?.toLowerCase().includes('student'));
+    if (bulkGroup === 'Men') filtered = targets.filter(m => m.gender === 'Male');
+    if (bulkGroup === 'Women') filtered = targets.filter(m => m.gender === 'Female');
+    if (bulkGroup === 'Present') filtered = targets.filter(m => presentNames.includes(m.full_name));
+    if (bulkGroup === 'Absent') filtered = targets.filter(m => !presentNames.includes(m.full_name));
+
+    const emails = filtered.map(m => m.email).filter(e => e !== null && e.trim() !== '') as string[];
+    if (emails.length === 0) { setIsSubmitting(false); return alert('No valid email addresses found for this group on the selected date.'); }
+    
+    const bccList = emails.join(',');
+    const subject = encodeURIComponent("Update from Grace Citadel");
+    const body = encodeURIComponent(bulkText);
+    
+    window.location.href = `mailto:?bcc=${bccList}&subject=${subject}&body=${body}`;
     setIsSubmitting(false);
   };
 
@@ -569,7 +600,6 @@ export default function App() {
           </div>
         )}
 
-        {/* --- 🔥 RESTORED ATTENDANCE COMPONENT 🔥 --- */}
         {!isCellLeader && activeView === 'attendance' && (
           <div className="max-w-4xl mx-auto bg-[#F6F1E4] p-8 rounded-xl shadow-xl border border-[#C8A24D]/30 relative z-10">
             <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] mb-6 transition-colors"><ArrowLeft size={16} /> Back to Dashboard</button>
@@ -615,7 +645,6 @@ export default function App() {
           </div>
         )}
 
-        {/* --- 🔥 RESTORED REGISTRATION COMPONENT 🔥 --- */}
         {!isCellLeader && activeView === 'members' && (
           <div className="max-w-4xl mx-auto bg-[#F6F1E4] p-8 rounded-xl shadow-xl border border-[#C8A24D]/30 relative z-10">
             <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] mb-6 transition-colors"><ArrowLeft size={16} /> Back to Dashboard</button>
@@ -646,6 +675,7 @@ export default function App() {
               </div>
 
               <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Occupation</label><input type="text" value={occupation} onChange={(e) => setOccupation(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" /></div>
+              <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Email</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-plex outline-none focus:border-[#C8A24D]" /></div>
               <div><label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Phone</label><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 text-[#1C1730] font-plex outline-none focus:border-[#C8A24D]" /></div>
               
               <button type="submit" disabled={isSubmitting} className="bg-[#0B1330] text-[#C8A24D] px-4 py-4 rounded font-bold font-inter uppercase tracking-widest hover:bg-[#2F1B4D] shadow-lg transition-colors border border-[#0B1330] mt-4 disabled:opacity-50">
@@ -657,7 +687,6 @@ export default function App() {
           </div>
         )}
 
-        {/* --- 🔥 RESTORED CELL MEETING LOG COMPONENT 🔥 --- */}
         {activeView === 'cell_log' && (
           <div className="max-w-4xl mx-auto bg-[#F6F1E4] p-8 rounded-xl shadow-xl border border-[#C8A24D]/30 relative z-10">
             {!isCellLeader && <button onClick={() => setActiveView('dashboard')} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] mb-6 transition-colors"><ArrowLeft size={16} /> Back to Dashboard</button>}
@@ -732,7 +761,6 @@ export default function App() {
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {/* SUNDAY LOG */}
                         <div className="bg-white border border-[#C8A24D]/30 rounded-xl overflow-hidden shadow-sm">
                             <div className="bg-[#0B1330] p-4 font-bold font-inter text-[#C8A24D] uppercase tracking-widest text-xs flex justify-between">
                                 <span>Sunday Service Log</span>
@@ -752,7 +780,6 @@ export default function App() {
                             </div>
                         </div>
 
-                        {/* MID-WEEK CELL LOG */}
                         <div className="bg-white border border-[#C8A24D]/30 rounded-xl overflow-hidden shadow-sm">
                             <div className="bg-[#2F1B4D] p-4 font-bold font-inter text-[#F6F1E4] uppercase tracking-widest text-xs flex justify-between">
                                 <span>Mid-Week Cell Log</span>
@@ -919,6 +946,7 @@ export default function App() {
                             <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t border-[#C8A24D]/20">
                                 <button onClick={prepareBulkQueue} disabled={isSubmitting} className="flex-1 bg-[#C8A24D] text-[#0B1330] font-bold font-inter tracking-wide py-4 rounded shadow-lg hover:bg-[#b59040] flex items-center justify-center gap-2 transition-colors disabled:opacity-50">{isSubmitting ? 'Processing...' : <><MessageCircle size={22}/> Start WhatsApp Queue</>}</button>
                                 <button onClick={handleSendBulkSMS} disabled={isSubmitting} className="flex-1 bg-[#0B1330] text-[#C8A24D] font-bold font-inter tracking-wide py-4 rounded shadow-lg hover:bg-[#2F1B4D] flex items-center justify-center gap-2 transition-colors disabled:opacity-50 border border-[#C8A24D]/50"><MessageSquare size={22}/> Send Bulk SMS</button>
+                                <button onClick={handleSendBulkEmail} disabled={isSubmitting} className="flex-1 bg-white text-[#0B1330] font-bold font-inter tracking-wide py-4 rounded shadow-lg hover:bg-[#0B1330]/5 flex items-center justify-center gap-2 transition-colors disabled:opacity-50 border border-[#C8A24D]/50"><Mail size={22}/> Send Bulk Email</button>
                             </div>
                         </div>
                     )}
