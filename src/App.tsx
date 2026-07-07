@@ -8,7 +8,7 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // --- DESIGN SYSTEM: OFFICIAL LOGO ---
-const GraceCrest = ({ className = "h-16 w-auto", opacity = 1 }) => (
+const GraceCrest = ({ className = "h-24 w-auto", opacity = 1 }) => (
   <img 
     src="https://tijlitzryjdhfebpjrao.supabase.co/storage/v1/object/public/Assets/WHITE.png" 
     alt="Grace Citadel Int'l Logo" 
@@ -144,7 +144,7 @@ export default function App() {
     }
   };
 
-  const fetchMembersForCheckin = async () => { const { data } = await supabase.from('members').select('id, full_name, phone_number').order('full_name'); if (data) setMemberList(data); };
+  const fetchMembersForCheckin = async () => { const { data } = await supabase.from('members').select('*').order('full_name'); if (data) setMemberList(data); };
   
   const fetchGuests = async () => { 
       const { data: guests } = await supabase.from('members').select('*').in('status', ['1st Timer', '2nd Timer']).order('created_at', { ascending: false }); 
@@ -370,7 +370,6 @@ export default function App() {
     setIsSubmitting(false);
   };
 
-  // --- 🔥 NEW: SEND BULK EMAIL LOGIC 🔥 ---
   const handleSendBulkEmail = async () => {
     setIsSubmitting(true);
     const { data: targets } = await supabase.from('members').select('full_name, phone_number, email, gender, status, occupation');
@@ -722,12 +721,17 @@ export default function App() {
                         <label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Search Member</label>
                         <div className="relative">
                             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><Search size={18} className="text-[#C8A24D]" /></div>
-                            <input type="text" placeholder="Type a name..." value={trackingSearchTerm} onChange={(e) => setTrackingSearchTerm(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 pl-12 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" />
+                            <input type="text" placeholder="Search by name, phone, or birthday (e.g., March)..." value={trackingSearchTerm} onChange={(e) => setTrackingSearchTerm(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 pl-12 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" />
                         </div>
                     </div>
                     <div className="border border-[#C8A24D]/40 rounded-lg overflow-hidden bg-white shadow-sm">
                         <div className="max-h-[50vh] overflow-y-auto p-2 bg-[#F6F1E4]">
-                            {memberList.filter(m => m.full_name.toLowerCase().includes(trackingSearchTerm.toLowerCase())).map((m, idx) => (
+                            {memberList.filter(m => {
+                                const term = trackingSearchTerm.toLowerCase();
+                                return (m.full_name?.toLowerCase().includes(term)) || 
+                                       (m.phone_number?.includes(term)) || 
+                                       (m.date_of_birth?.toLowerCase().includes(term));
+                            }).map((m, idx) => (
                                 <div key={m.id || idx} onClick={() => handleSelectTrackingMember(m)} className="p-4 hover:bg-white rounded cursor-pointer border-b border-[#C8A24D]/10 last:border-0 transition-colors flex justify-between items-center group">
                                     <span className="text-[#1C1730] font-bold font-inter text-lg">{m.full_name}</span>
                                     <span className="text-[#C8A24D] font-bold text-sm opacity-0 group-hover:opacity-100 transition-opacity">View Profile Record &rarr;</span>
@@ -738,14 +742,24 @@ export default function App() {
                 </>
             ) : (
                 <div className="space-y-6">
-                    <div className="bg-[#0B1330] p-6 rounded-xl text-[#F6F1E4] shadow-md border border-[#C8A24D]/50 flex flex-col md:flex-row justify-between md:items-center gap-6">
-                        <div>
-                            <h3 className="text-3xl font-cormorant font-bold text-[#C8A24D] mb-1">{selectedTrackingMember.full_name}</h3>
-                            <div className="text-sm font-plex opacity-80 flex gap-4 flex-wrap">
-                                <span>{selectedTrackingMember.phone_number || 'No phone'}</span>
-                                <span>•</span>
-                                <span>{selectedTrackingMember.status || 'Regular'}</span>
-                                {selectedTrackingMember.occupation && <span>• {selectedTrackingMember.occupation}</span>}
+                    <div className="bg-[#0B1330] p-6 rounded-xl text-[#F6F1E4] shadow-md border border-[#C8A24D]/50 flex flex-col lg:flex-row justify-between lg:items-center gap-6">
+                        <div className="flex items-center gap-6">
+                            <div className="w-24 h-24 min-w-[96px] rounded border-2 border-[#C8A24D] bg-[#1C1730] flex flex-col items-center justify-center shadow-inner overflow-hidden relative group">
+                                <div className="text-4xl text-[#C8A24D] font-cinzel font-bold">{selectedTrackingMember.full_name.charAt(0)}</div>
+                                <div className="absolute bottom-0 w-full bg-[#C8A24D]/90 text-[#0B1330] text-[8px] font-bold font-inter text-center py-0.5 uppercase tracking-widest opacity-80">Biometric</div>
+                            </div>
+                            <div>
+                                <h3 className="text-3xl font-cormorant font-bold text-[#C8A24D] mb-2">{selectedTrackingMember.full_name}</h3>
+                                <div className="text-xs font-plex opacity-80 flex gap-x-4 gap-y-2 flex-wrap mb-3">
+                                    <span className="flex items-center gap-1">📞 {selectedTrackingMember.phone_number || 'No phone'}</span>
+                                    <span className="flex items-center gap-1">🎂 {selectedTrackingMember.date_of_birth || 'No DOB'}</span>
+                                    <span className="flex items-center gap-1">✉️ {selectedTrackingMember.email || 'No email'}</span>
+                                </div>
+                                <div className="flex gap-2 flex-wrap">
+                                    <span className="bg-[#1C1730] text-xs font-bold font-inter px-2 py-1 rounded border border-[#C8A24D]/30 uppercase tracking-widest">{selectedTrackingMember.status || 'Regular'}</span>
+                                    {selectedTrackingMember.occupation && <span className="bg-[#1C1730] text-xs font-bold font-inter px-2 py-1 rounded border border-[#C8A24D]/30 uppercase tracking-widest">{selectedTrackingMember.occupation}</span>}
+                                    {selectedTrackingMember.gender && <span className="bg-[#1C1730] text-xs font-bold font-inter px-2 py-1 rounded border border-[#C8A24D]/30 uppercase tracking-widest">{selectedTrackingMember.gender}</span>}
+                                </div>
                             </div>
                         </div>
                         <div className="flex gap-4">
