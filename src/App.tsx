@@ -8,7 +8,7 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // --- DESIGN SYSTEM: OFFICIAL LOGO ---
-const GraceCrest = ({ className = "h-24 w-auto", opacity = 1 }) => (
+const GraceCrest = ({ className = "h-16 w-auto", opacity = 1 }) => (
   <img 
     src="https://tijlitzryjdhfebpjrao.supabase.co/storage/v1/object/public/Assets/WHITE.png" 
     alt="Grace Citadel Int'l Logo" 
@@ -155,7 +155,11 @@ export default function App() {
           const enrichedGuests = guests.map(g => {
               const myCheckins = checkins?.filter(c => c.member_name === g.full_name).map(c => c.service_date).sort() || [];
               
-              const fallbackFirstVisit = g.created_at ? new Date(g.created_at).toISOString().split('T')[0] : null;
+              let fallbackFirstVisit = null;
+              if (g.created_at) {
+                  const parsed = new Date(g.created_at);
+                  if (!isNaN(parsed.getTime())) fallbackFirstVisit = parsed.toISOString().split('T')[0];
+              }
               
               return { 
                   ...g, 
@@ -705,23 +709,32 @@ export default function App() {
           </div>
         )}
 
+        {/* ------------------------------------------------------------- */}
+        {/* 🔥 THIS IS THE UPDATED BIOMETRIC MEMBER SEARCH VIEW 🔥 */}
+        {/* ------------------------------------------------------------- */}
         {!isCellLeader && activeView === 'member_history' && isAdmin && (
           <div className="max-w-5xl mx-auto bg-[#F6F1E4] p-8 rounded-xl shadow-xl border border-[#C8A24D]/30 relative z-10">
             <button onClick={() => { if(selectedTrackingMember) setSelectedTrackingMember(null); else setActiveView('dashboard'); }} className="flex items-center gap-2 text-sm font-bold font-inter text-[#0B1330] hover:text-[#C8A24D] mb-6 transition-colors">
                 <ArrowLeft size={16} /> {selectedTrackingMember ? 'Back to Search' : 'Back to Dashboard'}
             </button>
             <div className="flex items-center gap-3 mb-8 border-b-2 border-[#C8A24D]/20 pb-4">
-                <History className="text-[#C8A24D]" size={32} />
-                <h2 className="text-3xl font-cormorant font-bold text-[#0B1330]">Individual Tracking Profile</h2>
+                <Search className="text-[#C8A24D]" size={32} />
+                <h2 className="text-3xl font-cormorant font-bold text-[#0B1330]">Member Search & Biometrics</h2>
             </div>
             
             {!selectedTrackingMember ? (
                 <>
                     <div className="mb-6">
-                        <label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Search Member</label>
+                        <label className="block text-xs font-bold font-inter uppercase tracking-widest text-[#1C1730]/70 mb-2">Search Database</label>
                         <div className="relative">
                             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><Search size={18} className="text-[#C8A24D]" /></div>
-                            <input type="text" placeholder="Search by name, phone, or birthday (e.g., March)..." value={trackingSearchTerm} onChange={(e) => setTrackingSearchTerm(e.target.value)} className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 pl-12 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D]" />
+                            <input 
+                                type="text" 
+                                placeholder="Search by name, phone number, or birthday (e.g., March)..." 
+                                value={trackingSearchTerm} 
+                                onChange={(e) => setTrackingSearchTerm(e.target.value)} 
+                                className="w-full bg-white border border-[#C8A24D]/30 rounded p-3 pl-12 text-[#1C1730] font-inter outline-none focus:border-[#C8A24D] focus:ring-1 focus:ring-[#C8A24D]" 
+                            />
                         </div>
                     </div>
                     <div className="border border-[#C8A24D]/40 rounded-lg overflow-hidden bg-white shadow-sm">
@@ -737,6 +750,7 @@ export default function App() {
                                     <span className="text-[#C8A24D] font-bold text-sm opacity-0 group-hover:opacity-100 transition-opacity">View Profile Record &rarr;</span>
                                 </div>
                             ))}
+                            {memberList.length === 0 && <div className="p-8 text-center text-[#1C1730]/50 font-plex italic">No members found in database.</div>}
                         </div>
                     </div>
                 </>
@@ -744,6 +758,7 @@ export default function App() {
                 <div className="space-y-6">
                     <div className="bg-[#0B1330] p-6 rounded-xl text-[#F6F1E4] shadow-md border border-[#C8A24D]/50 flex flex-col lg:flex-row justify-between lg:items-center gap-6">
                         <div className="flex items-center gap-6">
+                            {/* BIOMETRIC ID BOX */}
                             <div className="w-24 h-24 min-w-[96px] rounded border-2 border-[#C8A24D] bg-[#1C1730] flex flex-col items-center justify-center shadow-inner overflow-hidden relative group">
                                 <div className="text-4xl text-[#C8A24D] font-cinzel font-bold">{selectedTrackingMember.full_name.charAt(0)}</div>
                                 <div className="absolute bottom-0 w-full bg-[#C8A24D]/90 text-[#0B1330] text-[8px] font-bold font-inter text-center py-0.5 uppercase tracking-widest opacity-80">Biometric</div>
